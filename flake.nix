@@ -34,6 +34,7 @@
               gnumake
               crate2nix
               pkg-config
+              bintools
             ];
             buildInputs = lib.optionals stdenv.isDarwin [
               libiconv
@@ -43,6 +44,22 @@
             ] ++ lib.optionals stdenv.isLinux [
               openssl
               glibc
+            ];
+          };
+        devShells.x86_64-linux-shell =
+          let
+            linuxPkgs =
+              if system == "x86_64-linux"
+              then pkgs.pkgsStatic
+              else (import nixpkgs {
+                system = if system == "aarch64-darwin" then "x86_64-darwin" else system;
+              }).pkgsCross.musl64.pkgsStatic;
+          in
+          with linuxPkgs; mkShell {
+            nativeBuildInputs = [
+              pkg-config
+            ];
+            buildInputs = [
             ];
           };
       }

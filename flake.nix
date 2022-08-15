@@ -30,11 +30,9 @@
           with pkgs; mkShell {
             nativeBuildInputs = [
               rust-toolchain
-              qemu
               gnumake
               crate2nix
               pkg-config
-              bintools
             ];
             buildInputs = lib.optionals stdenv.isDarwin [
               libiconv
@@ -42,11 +40,10 @@
               darwin.apple_sdk.frameworks.CoreFoundation
               darwin.apple_sdk.frameworks.Security
             ] ++ lib.optionals stdenv.isLinux [
-              openssl
               glibc
             ];
           };
-        devShells.x86_64-linux-shell =
+        devShells.linux-shell =
           let
             linuxPkgs =
               if system == "x86_64-linux"

@@ -22,6 +22,12 @@
         cargoNix = import ./Cargo.nix {
           inherit pkgs buildRustCrateForPkgs;
         };
+        linuxPkgs =
+          if system == "x86_64-linux"
+          then pkgs.pkgsStatic
+          else (import nixpkgs {
+            system = if system == "aarch64-darwin" then "x86_64-darwin" else system;
+          }).pkgsCross.musl64.pkgsStatic;
       in
       rec {
         packages = {
@@ -33,6 +39,7 @@
               gnumake
               crate2nix
               pkg-config
+              linuxPkgs.stdenv.cc.bintools.bintools_bin
             ];
             buildInputs = lib.optionals stdenv.isDarwin [
               libiconv
@@ -42,23 +49,8 @@
             ] ++ lib.optionals stdenv.isLinux [
               glibc
             ];
+            LINUX_LIBC = linuxPkgs.stdenv.cc.libc;
           };
-        devShells.linux-shell =
-          let
-            linuxPkgs =
-              if system == "x86_64-linux"
-              then pkgs.pkgsStatic
-              else (import nixpkgs {
-                system = if system == "aarch64-darwin" then "x86_64-darwin" else system;
-              }).pkgsCross.musl64.pkgsStatic;
-          in
-          with linuxPkgs; mkShell {
-            nativeBuildInputs = [
-              pkg-config
-            ];
-            buildInputs = [
-            ];
-          };
-      }
+        }
     );
 }

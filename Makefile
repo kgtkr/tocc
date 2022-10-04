@@ -3,3 +3,6 @@
 
 %.o: %.s
 	x86_64-unknown-linux-musl-as -o $@ $<
+
+%.s: %.c
+	cargo run $< > $@

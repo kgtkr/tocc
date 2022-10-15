@@ -1,6 +1,7 @@
 use crate::pos::Pos;
 use crate::token::{Token, TokenPayload};
 use guard::guard;
+use std::fmt;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
@@ -86,7 +87,7 @@ impl Lexer {
             '0'..='9' => {
                 let mut num = c.to_digit(10).unwrap() as i64;
                 while let Ok(c) = self.expect(|c| c.is_digit(10)) {
-                    num = num * 10 + c.to_digit(10).unwrap() as i64;
+                    num = num * 10 + c.to_digit(10).unwrap() as i64; // TODO: overflow check
                 }
                 Some(TokenPayload::IntLit(num))
             }
@@ -106,5 +107,14 @@ impl Lexer {
             tokens.push(token);
         }
         Ok(tokens)
+    }
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self.payload {
+            TokenPayload::IntLit(n) => write!(f, "{}", n),
+            TokenPayload::EOF => write!(f, "EOF"),
+        }
     }
 }

@@ -6,4 +6,5 @@ version = "0.1.0"
 [dependencies]
 anyhow = "1.0.65"
 clap = "4.0.9"
+guard = "0.5.1"
 thiserror = "1.0.37"

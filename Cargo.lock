@@ -48,6 +48,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "guard"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff893cc51ea04f8a3b73fbaf4376c06ebc5a0ccbe86d460896f805d9417c93ea"
+
+[[package]]
 name = "hermit-abi"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -138,6 +144,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "guard",
  "thiserror",
 ]
 

@@ -9,4 +9,5 @@ pub struct Token {
 #[derive(Debug, Clone)]
 pub enum TokenPayload {
     IntLit(i64),
+    EOF,
 }

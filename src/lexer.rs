@@ -15,16 +15,16 @@ pub enum LexerError {
 #[derive(Debug)]
 pub struct Lexer {
     input: Vec<char>,
-    pos: usize,
-    virtual_pos: Pos,
+    idx: usize,
+    pos: Pos,
 }
 
 impl Lexer {
     pub fn new(filename: String, input: String) -> Lexer {
         Lexer {
             input: input.chars().collect(),
-            pos: 0,
-            virtual_pos: Pos {
+            idx: 0,
+            pos: Pos {
                 filename,
                 line: 1,
                 col: 1,
@@ -33,18 +33,18 @@ impl Lexer {
     }
 
     fn inc_pos(&mut self) {
-        if self.input[self.pos] == '\n' {
-            self.virtual_pos.line += 1;
-            self.virtual_pos.col = 1;
+        if self.input[self.idx] == '\n' {
+            self.pos.line += 1;
+            self.pos.col = 1;
         } else {
-            self.virtual_pos.col += 1;
+            self.pos.col += 1;
         }
 
-        self.pos += 1;
+        self.idx += 1;
     }
 
     fn peek(&self) -> Option<char> {
-        self.input.get(self.pos).copied()
+        self.input.get(self.idx).copied()
     }
 
     fn expect(&mut self, f: impl Fn(char) -> bool) -> Result<char, LexerError> {
@@ -56,7 +56,7 @@ impl Lexer {
             Ok(c)
         } else {
             Err(LexerError::InvalidCharacter {
-                pos: self.virtual_pos.clone(),
+                pos: self.pos.clone(),
                 c,
             })
         }
@@ -71,7 +71,7 @@ impl Lexer {
     }
 
     fn next_token_opt(&mut self) -> Result<Option<Token>, LexerError> {
-        let begin_pos = self.virtual_pos.clone();
+        let begin_pos = self.pos.clone();
         let c = match self.next() {
             Ok(c) => c,
             Err(LexerError::UnexpectedEOF) => {

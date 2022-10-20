@@ -1,4 +1,4 @@
-use crate::pos::Pos;
+use crate::loc::Loc;
 use crate::token::{Token, TokenPayload};
 use guard::guard;
 use std::fmt;
@@ -6,8 +6,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
 pub enum LexerError {
-    #[error("{pos} - invalid character: {c}")]
-    InvalidCharacter { pos: Pos, c: char },
+    #[error("{loc} - invalid character: {c}")]
+    InvalidCharacter { loc: Loc, c: char },
     #[error("unexpected end of file")]
     UnexpectedEOF,
 }
@@ -16,7 +16,7 @@ pub enum LexerError {
 pub struct Lexer {
     input: Vec<char>,
     idx: usize,
-    pos: Pos,
+    loc: Loc,
 }
 
 impl Lexer {
@@ -24,7 +24,7 @@ impl Lexer {
         Lexer {
             input: input.chars().collect(),
             idx: 0,
-            pos: Pos {
+            loc: Loc {
                 filename,
                 line: 1,
                 col: 1,
@@ -32,12 +32,12 @@ impl Lexer {
         }
     }
 
-    fn inc_pos(&mut self) {
+    fn inc_loc(&mut self) {
         if self.input[self.idx] == '\n' {
-            self.pos.line += 1;
-            self.pos.col = 1;
+            self.loc.line += 1;
+            self.loc.col = 1;
         } else {
-            self.pos.col += 1;
+            self.loc.col += 1;
         }
 
         self.idx += 1;
@@ -52,11 +52,11 @@ impl Lexer {
             return Err(LexerError::UnexpectedEOF);
         });
         if f(c) {
-            self.inc_pos();
+            self.inc_loc();
             Ok(c)
         } else {
             Err(LexerError::InvalidCharacter {
-                pos: self.pos.clone(),
+                loc: self.loc.clone(),
                 c,
             })
         }
@@ -71,13 +71,13 @@ impl Lexer {
     }
 
     fn next_token_opt(&mut self) -> Result<Option<Token>, LexerError> {
-        let begin_pos = self.pos.clone();
+        let begin_loc = self.loc.clone();
         let c = match self.next() {
             Ok(c) => c,
             Err(LexerError::UnexpectedEOF) => {
                 return Ok(Some(Token {
                     payload: TokenPayload::EOF,
-                    pos: begin_pos,
+                    loc: begin_loc,
                 }))
             }
             Err(e) => return Err(e),
@@ -92,12 +92,12 @@ impl Lexer {
                 Some(TokenPayload::IntLit(num))
             }
             ' ' | '\t' | '\r' | '\n' => None,
-            _ => return Err(LexerError::InvalidCharacter { pos: begin_pos, c }),
+            _ => return Err(LexerError::InvalidCharacter { loc: begin_loc, c }),
         };
 
         Ok(payload.map(|payload| Token {
             payload,
-            pos: begin_pos,
+            loc: begin_loc,
         }))
     }
 

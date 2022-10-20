@@ -1,4 +1,4 @@
-use crate::pos::Pos;
+use crate::loc::Loc;
 
 #[derive(Debug, Clone)]
 pub enum ExprPayload {
@@ -7,6 +7,6 @@ pub enum ExprPayload {
 
 #[derive(Debug, Clone)]
 pub struct Expr {
-    pub pos: Pos,
+    pub loc: Loc,
     pub payload: ExprPayload,
 }

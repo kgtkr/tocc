@@ -1,14 +1,14 @@
 use crate::ast::{Expr, ExprPayload};
-use crate::pos::Pos;
+use crate::loc::Loc;
 use crate::token::{Token, TokenPayload};
 use guard::guard;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
 pub enum ParseError {
-    #[error("{pos} - invalid token: {token}, expected: {expected}")]
+    #[error("{loc} - invalid token: {token}, expected: {expected}")]
     InvalidToken {
-        pos: Pos,
+        loc: Loc,
         token: Token,
         expected: String,
     },
@@ -37,14 +37,14 @@ impl Parser {
         let token = self.peek().clone();
         guard!(let TokenPayload::IntLit(i) = &token.payload else {
             return Err(ParseError::InvalidToken {
-                pos: token.pos.clone(),
+                loc: token.loc.clone(),
                 token: token.clone(),
                 expected: "int literal".to_string(),
             });
         });
         self.inc_idx();
         Ok(Expr {
-            pos: token.pos.clone(),
+            loc: token.loc.clone(),
             payload: ExprPayload::IntLit(*i),
         })
     }
@@ -53,7 +53,7 @@ impl Parser {
         let token = self.peek();
         guard!(let TokenPayload::EOF = &token.payload else {
             return Err(ParseError::InvalidToken {
-                pos: token.pos.clone(),
+                loc: token.loc.clone(),
                 token: token.clone(),
                 expected: "EOF".to_string(),
             });

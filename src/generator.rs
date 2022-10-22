@@ -20,4 +20,8 @@ impl Generator {
             }
         }
     }
+
+    pub fn output(self) -> String {
+        self.output
+    }
 }

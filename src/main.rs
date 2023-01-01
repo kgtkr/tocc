@@ -12,11 +12,11 @@ struct Args {
     output: String,
 }
 
-fn main() {
+fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
-    let input = read_to_string(&args.input).unwrap();
-    let tokens = Lexer::new(args.input.clone(), input).tokenize().unwrap();
-    let ast = Parser::new(tokens).expr().unwrap();
+    let input = read_to_string(&args.input)?;
+    let tokens = Lexer::new(args.input.clone(), input).tokenize()?;
+    let ast = Parser::new(tokens).expr()?;
     let mut generator = Generator::new();
     generator.expr(ast);
     let mut output = r"
@@ -32,5 +32,7 @@ fn main() {
     ret
     ",
     );
-    std::fs::write(&args.output, output).unwrap();
+    std::fs::write(&args.output, output)?;
+
+    Ok(())
 }

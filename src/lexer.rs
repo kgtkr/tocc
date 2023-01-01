@@ -121,9 +121,13 @@ impl Lexer {
 
     pub fn tokenize(&mut self) -> Result<Vec<Token>, LexerError> {
         let mut tokens = Vec::new();
-        while let Some(token) = self.next_token_opt()? {
-            tokens.push(token);
+        loop {
+            if let Some(token) = self.next_token_opt()? {
+                tokens.push(token.clone());
+                if let TokenPayload::EOF = token.payload {
+                    return Ok(tokens);
+                }
+            }
         }
-        Ok(tokens)
     }
 }

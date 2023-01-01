@@ -16,22 +16,8 @@ fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse();
     let input = read_to_string(&args.input)?;
     let tokens = Lexer::new(args.input.clone(), input).tokenize()?;
-    let ast = Parser::new(tokens).expr()?;
-    let mut generator = Generator::new();
-    generator.expr(ast);
-    let mut output = r"
-    .intel_syntax noprefix
-    .globl main
-    main:
-    "
-    .to_string();
-    output.push_str(&generator.output());
-    output.push_str(
-        "
-    pop rax
-    ret
-    ",
-    );
+    let ast = Parser::new(tokens).parse()?;
+    let output = Generator::new().generate(ast);
     std::fs::write(&args.output, output)?;
 
     Ok(())

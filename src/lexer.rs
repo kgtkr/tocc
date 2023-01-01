@@ -1,7 +1,6 @@
 use crate::loc::Loc;
 use crate::token::{Token, TokenPayload};
 use guard::guard;
-use std::fmt;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
@@ -72,12 +71,14 @@ impl Lexer {
 
     fn next_token_opt(&mut self) -> Result<Option<Token>, LexerError> {
         let begin_loc = self.loc.clone();
+        let begin_idx = self.idx;
         let c = match self.next() {
             Ok(c) => c,
             Err(LexerError::UnexpectedEOF) => {
                 return Ok(Some(Token {
                     payload: TokenPayload::EOF,
                     loc: begin_loc,
+                    value: "<EOF>".to_string(),
                 }))
             }
             Err(e) => return Err(e),
@@ -91,6 +92,22 @@ impl Lexer {
                 }
                 Some(TokenPayload::IntLit(num))
             }
+            'a'..='z' | 'A'..='Z' | '_' => {
+                let mut ident = String::new();
+                ident.push(c);
+                while let Ok(c) = self.expect(|c| c.is_ascii_alphanumeric() || c == '_') {
+                    ident.push(c);
+                }
+                Some(match ident.as_str() {
+                    "return" => TokenPayload::Return,
+                    _ => TokenPayload::Ident(ident),
+                })
+            }
+            '(' => Some(TokenPayload::ParenOpen),
+            ')' => Some(TokenPayload::ParenClose),
+            '{' => Some(TokenPayload::BraceOpen),
+            '}' => Some(TokenPayload::BraceClose),
+            ';' => Some(TokenPayload::Semicolon),
             ' ' | '\t' | '\r' | '\n' => None,
             _ => return Err(LexerError::InvalidCharacter { loc: begin_loc, c }),
         };
@@ -98,6 +115,7 @@ impl Lexer {
         Ok(payload.map(|payload| Token {
             payload,
             loc: begin_loc,
+            value: self.input[begin_idx..self.idx].iter().collect(),
         }))
     }
 
@@ -107,14 +125,5 @@ impl Lexer {
             tokens.push(token);
         }
         Ok(tokens)
-    }
-}
-
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self.payload {
-            TokenPayload::IntLit(n) => write!(f, "{}", n),
-            TokenPayload::EOF => write!(f, "EOF"),
-        }
     }
 }

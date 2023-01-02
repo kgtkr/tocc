@@ -30,6 +30,7 @@
           }).pkgsCross.musl64.pkgsStatic;
       in
       rec {
+        # TODO: https://github.com/kolloch/crate2nix/issues/267
         defaultPackage = crate.rootCrate.build;
         devShell =
           with pkgs; mkShell {

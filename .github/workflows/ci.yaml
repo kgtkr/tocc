@@ -44,8 +44,8 @@ jobs:
         run: ./run-e2e.sh
       - name: Release build
         run: |
-          nix build . --out-link result-release
+          cargo build --release
       - uses: actions/upload-artifact@v3
         with:
           name: tocc-${{ runner.os }}
-          path: result-release/bin/tocc
+          path: ./target/release/tocc

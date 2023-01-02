@@ -2,14 +2,9 @@ name: ci
 on: push
 jobs:
   check:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: docker-practice/actions-setup-docker@master
-        if: runner.os == 'MacOS'
       - uses: cachix/install-nix-action@v15
         with:
           nix_path: nixpkgs=channel:nixos-unstable
@@ -49,5 +44,5 @@ jobs:
           cargo build --release
       - uses: actions/upload-artifact@v3
         with:
-          name: tocc-${{ runner.os }}
+          name: tocc
           path: ./target/release/tocc

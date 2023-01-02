@@ -13,7 +13,7 @@
           inherit system overlays;
         };
         pkgs = import nixpkgs pkgsArgs;
-        rust-toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+        rust-toolchain = pkgs: pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
         buildRustCrateForPkgs = pkgs: pkgs.buildRustCrate.override {
           rustc = rust-toolchain pkgs;
           defaultCrateOverrides = pkgs.defaultCrateOverrides // {
@@ -34,7 +34,7 @@
         devShell =
           with pkgs; mkShell {
             nativeBuildInputs = [
-              rust-toolchain
+              (rust-toolchain pkgs)
               gnumake
               crate2nix
               pkg-config

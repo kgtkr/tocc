@@ -7,5 +7,8 @@
 %.o: %.s
 	x86_64-unknown-linux-musl-as -o $@ $<
 
-%.s: %.c
-	cargo run -- $< -o $@
+%.s: %.c target/debug/tocc
+	target/debug/tocc $< -o $@
+
+target/debug/tocc: src/**
+	cargo build

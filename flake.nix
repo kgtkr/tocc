@@ -19,7 +19,7 @@
           defaultCrateOverrides = pkgs.defaultCrateOverrides // {
           };
         };
-        cargoNix = import ./Cargo.nix {
+        crate = import ./Cargo.nix {
           inherit pkgs buildRustCrateForPkgs;
         };
         linuxPkgs =
@@ -30,8 +30,7 @@
           }).pkgsCross.musl64.pkgsStatic;
       in
       rec {
-        packages = {
-        };
+        defaultPackage = crate.rootCrate.build;
         devShell =
           with pkgs; mkShell {
             nativeBuildInputs = [

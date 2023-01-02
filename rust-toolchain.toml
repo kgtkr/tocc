@@ -1,4 +1,4 @@
 [toolchain]
-channel = "1.62.1"
-components = ["rustfmt", "clippy"]
+channel = "1.66.0"
+components = ["rustfmt", "clippy", "rust-src"]
 targets = ["x86_64-unknown-linux-musl"]

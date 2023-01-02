@@ -13,13 +13,13 @@
           inherit system overlays;
         };
         pkgs = import nixpkgs pkgsArgs;
-        rust-toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+        rust-toolchain = pkgs: pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
         buildRustCrateForPkgs = pkgs: pkgs.buildRustCrate.override {
           rustc = rust-toolchain pkgs;
           defaultCrateOverrides = pkgs.defaultCrateOverrides // {
           };
         };
-        cargoNix = import ./Cargo.nix {
+        crate = import ./Cargo.nix {
           inherit pkgs buildRustCrateForPkgs;
         };
         linuxPkgs =
@@ -30,12 +30,12 @@
           }).pkgsCross.musl64.pkgsStatic;
       in
       rec {
-        packages = {
-        };
+        # TODO: https://github.com/kolloch/crate2nix/issues/267
+        defaultPackage = crate.rootCrate.build;
         devShell =
           with pkgs; mkShell {
             nativeBuildInputs = [
-              rust-toolchain
+              (rust-toolchain pkgs)
               gnumake
               crate2nix
               pkg-config

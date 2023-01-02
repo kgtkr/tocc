@@ -27,6 +27,10 @@ jobs:
           key: cargo-cache-20230102-1-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             cargo-cache-20230102-1-
+      - name: crate2nix
+        run: |
+          crate2nix generate
+          git diff --exit-code
       - name: Run format
         run: |
           cargo fmt --all -- --check
@@ -35,3 +39,10 @@ jobs:
           cargo clippy --all
       - name: Run e2e tests
         run: ./run-e2e.sh
+      - name: Release build
+        run: |
+          nix build . --out-link result-release
+      - uses: actions/upload-artifact@v3
+        with:
+          name: tocc
+          path: result-release/bin/tocc

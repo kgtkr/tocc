@@ -1,22 +1,23 @@
-use crate::ast::{Decl, DeclPayload, Expr, ExprPayload, Program, Stmt, StmtPayload};
+use crate::{
+    ast::{Decl, DeclPayload, Expr, ExprPayload, Program, Stmt, StmtPayload},
+    buf::Buf,
+};
 
 #[derive(Debug)]
 pub struct Generator {
-    output: String,
+    output: Buf,
 }
 
 impl Generator {
     pub fn new() -> Generator {
-        Generator {
-            output: String::new(),
-        }
+        Generator { output: Buf::new() }
     }
 
     fn expr(&mut self, expr: Expr) {
         use ExprPayload::*;
         match expr.payload {
             IntLit(x) => {
-                self.output.push_str(&format!("mov rax, {}\n", x));
+                self.output.append(format!("mov rax, {}\n", x));
             }
         }
     }
@@ -29,8 +30,8 @@ impl Generator {
             }
             Return(expr) => {
                 self.expr(expr);
-                self.output.push_str("leave\n");
-                self.output.push_str("ret\n");
+                self.output.append("leave\n");
+                self.output.append("ret\n");
             }
             Compound(stmts) => {
                 for stmt in stmts {
@@ -44,10 +45,10 @@ impl Generator {
         use DeclPayload::*;
         match decl.payload {
             Func { name, body } => {
-                self.output.push_str(&format!("{}:\n", name));
-                self.output.push_str("push rbp\n");
-                self.output.push_str("mov rbp, rsp\n");
-                self.output.push_str(&format!("sub rsp, {}\n", 0));
+                self.output.append(format!("{}:\n", name));
+                self.output.append("push rbp\n");
+                self.output.append("mov rbp, rsp\n");
+                self.output.append(format!("sub rsp, {}\n", 0));
                 for stmt in body {
                     self.stmt(stmt);
                 }
@@ -56,15 +57,15 @@ impl Generator {
     }
 
     fn program(&mut self, program: Program) {
-        self.output.push_str(".intel_syntax noprefix\n");
-        self.output.push_str(".globl main\n");
+        self.output.append(".intel_syntax noprefix\n");
+        self.output.append(".globl main\n");
         for decl in program.decls {
             self.decl(decl);
         }
     }
 
-    pub fn generate(&mut self, program: Program) -> String {
+    pub fn generate(&mut self, program: Program) -> Vec<u8> {
         self.program(program);
-        self.output.clone()
+        self.output.to_vec()
     }
 }

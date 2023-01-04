@@ -71,6 +71,10 @@ impl Buf {
             }
         }
     }
+
+    pub fn append(&mut self, other: impl Into<Buf>) {
+        *self = std::mem::take(self).join(other);
+    }
 }
 
 impl From<Vec<u8>> for Buf {

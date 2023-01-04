@@ -1,5 +1,8 @@
 use crate::{
-    ast::{Decl, DeclPayload, Expr, ExprPayload, Program, Stmt, StmtPayload},
+    ast::{
+        Decl, DeclFunc, DeclPayload, Expr, ExprIntLit, ExprPayload, Program, Stmt, StmtCompound,
+        StmtExpr, StmtPayload, StmtReturn,
+    },
     buf::Buf,
 };
 
@@ -13,47 +16,9 @@ impl Generator {
         Generator { output: Buf::new() }
     }
 
-    fn expr(&mut self, expr: Expr) {
-        use ExprPayload::*;
-        match expr.payload {
-            IntLit(x) => {
-                self.output.append(format!("mov rax, {}\n", x));
-            }
-        }
-    }
-
-    fn stmt(&mut self, stmt: Stmt) {
-        use StmtPayload::*;
-        match stmt.payload {
-            Expr(expr) => {
-                self.expr(expr);
-            }
-            Return(expr) => {
-                self.expr(expr);
-                self.output.append("leave\n");
-                self.output.append("ret\n");
-            }
-            Compound(stmts) => {
-                for stmt in stmts {
-                    self.stmt(stmt);
-                }
-            }
-        }
-    }
-
-    fn decl(&mut self, decl: Decl) {
-        use DeclPayload::*;
-        match decl.payload {
-            Func { name, body } => {
-                self.output.append(format!("{}:\n", name));
-                self.output.append("push rbp\n");
-                self.output.append("mov rbp, rsp\n");
-                self.output.append(format!("sub rsp, {}\n", 0));
-                for stmt in body {
-                    self.stmt(stmt);
-                }
-            }
-        }
+    pub fn generate(&mut self, program: Program) -> Vec<u8> {
+        self.program(program);
+        self.output.to_vec()
     }
 
     fn program(&mut self, program: Program) {
@@ -64,8 +29,60 @@ impl Generator {
         }
     }
 
-    pub fn generate(&mut self, program: Program) -> Vec<u8> {
-        self.program(program);
-        self.output.to_vec()
+    fn decl(&mut self, decl: Decl) {
+        use DeclPayload::*;
+        match decl.payload {
+            Func(x) => {
+                self.decl_func(x);
+            }
+        }
+    }
+
+    fn decl_func(&mut self, x: DeclFunc) {
+        self.output.append(format!("{}:\n", x.name));
+        self.output.append("push rbp\n");
+        self.output.append("mov rbp, rsp\n");
+        self.output.append(format!("sub rsp, {}\n", 0));
+        self.stmt_compound(x.body);
+    }
+
+    fn stmt(&mut self, stmt: Stmt) {
+        use StmtPayload::*;
+        match stmt.payload {
+            Expr(x) => {
+                self.stmt_expr(x);
+            }
+            Return(x) => {
+                self.stmt_return(x);
+            }
+            Compound(x) => self.stmt_compound(x),
+        }
+    }
+
+    fn stmt_expr(&mut self, x: StmtExpr) {
+        self.expr(x.expr);
+    }
+
+    fn stmt_return(&mut self, x: StmtReturn) {
+        self.expr(x.expr);
+        self.output.append("leave\n");
+        self.output.append("ret\n");
+    }
+
+    fn stmt_compound(&mut self, x: StmtCompound) {
+        for stmt in x.stmts {
+            self.stmt(stmt);
+        }
+    }
+
+    fn expr(&mut self, expr: Expr) {
+        use ExprPayload::*;
+        match expr.payload {
+            IntLit(x) => self.expr_int_lit(x),
+        }
+    }
+
+    fn expr_int_lit(&mut self, x: ExprIntLit) {
+        self.output.append(format!("mov rax, {}\n", x.value));
     }
 }

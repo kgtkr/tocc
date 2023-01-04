@@ -1,4 +1,7 @@
-use crate::ast::{Decl, DeclPayload, Expr, ExprPayload, Program, Stmt, StmtPayload};
+use crate::ast::{
+    Decl, DeclFunc, DeclPayload, Expr, ExprIntLit, ExprPayload, Program, Stmt, StmtCompound,
+    StmtExpr, StmtPayload, StmtReturn,
+};
 use crate::loc::Loc;
 use crate::token::{Token, TokenPayload};
 use guard::guard;
@@ -43,7 +46,7 @@ impl Parser {
             });
         });
         self.inc_idx();
-        Ok(ExprPayload::IntLit(*i))
+        Ok(ExprPayload::IntLit(ExprIntLit { value: *i }))
     }
 
     fn eof(&mut self) -> Result<(), ParseError> {
@@ -92,7 +95,7 @@ impl Parser {
             });
         });
         self.inc_idx();
-        Ok(StmtPayload::Expr(expr))
+        Ok(StmtPayload::Expr(StmtExpr { expr }))
     }
 
     fn return_stmt(&mut self) -> Result<StmtPayload, ParseError> {
@@ -119,7 +122,7 @@ impl Parser {
             });
             self.inc_idx();
         }
-        Ok(StmtPayload::Return(expr))
+        Ok(StmtPayload::Return(StmtReturn { expr }))
     }
 
     fn compound_stmt_inner(&mut self) -> Result<Vec<Stmt>, ParseError> {
@@ -151,7 +154,7 @@ impl Parser {
 
     fn compound_stmt(&mut self) -> Result<StmtPayload, ParseError> {
         let stmts = self.compound_stmt_inner()?;
-        Ok(StmtPayload::Compound(stmts))
+        Ok(StmtPayload::Compound(StmtCompound { stmts }))
     }
 
     fn decl(&mut self) -> Result<Decl, ParseError> {
@@ -192,10 +195,10 @@ impl Parser {
         });
         self.inc_idx();
         let stmts = self.compound_stmt_inner()?;
-        Ok(DeclPayload::Func {
+        Ok(DeclPayload::Func(DeclFunc {
             name: name.clone(),
-            body: stmts,
-        })
+            body: StmtCompound { stmts },
+        }))
     }
 
     pub fn parse(&mut self) -> Result<Program, ParseError> {

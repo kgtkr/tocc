@@ -1,6 +1,6 @@
 use crate::clang::{
-    Decl, DeclFunc, DeclPayload, Expr, ExprIntLit, ExprPayload, Program, Stmt, StmtCompound,
-    StmtExpr, StmtPayload, StmtReturn,
+    Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprIntLit, ExprPayload, ExprSub, Program, Stmt,
+    StmtCompound, StmtExpr, StmtPayload, StmtReturn,
 };
 use crate::loc::Loc;
 use crate::token::{Token, TokenPayload};
@@ -36,39 +36,74 @@ impl Parser {
         self.tokens.get(self.idx).unwrap()
     }
 
-    fn int_lit(&mut self) -> Result<ExprPayload, ParseError> {
+    fn primary(&mut self) -> Result<Expr, ParseError> {
         let token = self.peek().clone();
-        guard!(let TokenPayload::IntLit(i) = &token.payload else {
-            return Err(ParseError::InvalidToken {
+        match token.payload {
+            TokenPayload::IntLit(i) => {
+                self.inc_idx();
+                Ok(Expr {
+                    loc: token.loc,
+                    payload: ExprPayload::IntLit(ExprIntLit { value: i }),
+                })
+            }
+            TokenPayload::ParenOpen => {
+                self.inc_idx();
+                let expr = self.expr()?;
+                let token = self.peek().clone();
+                guard!(let TokenPayload::ParenClose = token.payload else {
+                    return Err(ParseError::InvalidToken {
+                        loc: token.loc.clone(),
+                        token: token.clone(),
+                        expected: ")".to_string(),
+                    });
+                });
+                self.inc_idx();
+                Ok(expr)
+            }
+            _ => Err(ParseError::InvalidToken {
                 loc: token.loc.clone(),
-                token: token.clone(),
+                token,
                 expected: "int literal".to_string(),
-            });
-        });
-        self.inc_idx();
-        Ok(ExprPayload::IntLit(ExprIntLit { value: *i }))
+            }),
+        }
     }
 
-    fn eof(&mut self) -> Result<(), ParseError> {
-        let token = self.peek();
-        guard!(let TokenPayload::EOF = &token.payload else {
-            return Err(ParseError::InvalidToken {
-                loc: token.loc.clone(),
-                token: token.clone(),
-                expected: "EOF".to_string(),
-            });
-        });
-        self.inc_idx();
-        Ok(())
+    fn addsub(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.primary()?;
+        loop {
+            let token = self.peek().clone();
+            match token.payload {
+                TokenPayload::Plus => {
+                    self.inc_idx();
+                    let rhs = self.primary()?;
+                    expr = Expr {
+                        loc: token.loc,
+                        payload: ExprPayload::Add(ExprAdd {
+                            lhs: Box::new(expr),
+                            rhs: Box::new(rhs),
+                        }),
+                    };
+                }
+                TokenPayload::Minus => {
+                    self.inc_idx();
+                    let rhs = self.primary()?;
+                    expr = Expr {
+                        loc: token.loc,
+                        payload: ExprPayload::Sub(ExprSub {
+                            lhs: Box::new(expr),
+                            rhs: Box::new(rhs),
+                        }),
+                    };
+                }
+                _ => break,
+            }
+        }
+        Ok(expr)
     }
 
     fn expr(&mut self) -> Result<Expr, ParseError> {
-        let token = self.peek().clone();
-        let payload = self.int_lit()?;
-        Ok(Expr {
-            loc: token.loc,
-            payload,
-        })
+        let expr = self.addsub()?;
+        Ok(expr)
     }
 
     fn stat(&mut self) -> Result<Stmt, ParseError> {

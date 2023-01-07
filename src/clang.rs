@@ -59,9 +59,23 @@ pub struct Expr {
 #[derive(Debug, Clone)]
 pub enum ExprPayload {
     IntLit(ExprIntLit),
+    Add(ExprAdd),
+    Sub(ExprSub),
 }
 
 #[derive(Debug, Clone)]
 pub struct ExprIntLit {
     pub value: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprAdd {
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprSub {
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
 }

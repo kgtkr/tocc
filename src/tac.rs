@@ -33,6 +33,8 @@ pub struct Instr {
 pub enum InstrPayload {
     Return(InstrReturn),
     IntConst(InstrIntConst),
+    Add(InstrAdd),
+    Sub(InstrSub),
 }
 
 #[derive(Debug, Clone)]
@@ -44,4 +46,18 @@ pub struct InstrReturn {
 pub struct InstrIntConst {
     pub dst: usize,
     pub value: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrAdd {
+    pub dst: usize,
+    pub lhs: usize,
+    pub rhs: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrSub {
+    pub dst: usize,
+    pub lhs: usize,
+    pub rhs: usize,
 }

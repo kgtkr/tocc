@@ -20,6 +20,8 @@ pub enum TokenPayload {
     Semicolon,
     Return,
     EOF,
+    Plus,
+    Minus,
 }
 
 impl fmt::Display for Token {

@@ -1,4 +1,4 @@
-use crate::ast::{
+use crate::clang::{
     Decl, DeclFunc, DeclPayload, Expr, ExprIntLit, ExprPayload, Program, Stmt, StmtCompound,
     StmtExpr, StmtPayload, StmtReturn,
 };

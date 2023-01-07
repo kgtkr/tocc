@@ -1,9 +1,9 @@
 use crate::{
-    ast::{
+    buf::Buf,
+    clang::{
         Decl, DeclFunc, DeclPayload, Expr, ExprIntLit, ExprPayload, Program, Stmt, StmtCompound,
         StmtExpr, StmtPayload, StmtReturn,
     },
-    buf::Buf,
 };
 
 #[derive(Debug)]

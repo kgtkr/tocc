@@ -4,4 +4,6 @@ pub mod generator;
 pub mod lexer;
 pub mod loc;
 pub mod parser;
+pub mod tac;
+pub mod tac_generator;
 pub mod token;

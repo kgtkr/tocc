@@ -64,10 +64,6 @@ impl Lexer {
         self.expect(|_| true)
     }
 
-    fn expect_char(&mut self, c: char) -> Result<(), LexerError> {
-        self.expect(|x| x == c).map(|_| ())
-    }
-
     fn next_token_opt(&mut self) -> Result<Option<Token>, LexerError> {
         let begin_loc = self.loc.clone();
         let begin_idx = self.idx;

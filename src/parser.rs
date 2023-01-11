@@ -108,9 +108,9 @@ impl Parser {
     fn stat(&mut self) -> Result<Stmt, ParseError> {
         let token = self.peek().clone();
         let payload = match &token.payload {
-            TokenPayload::Return => self.return_stmt()?,
-            TokenPayload::BraceOpen => self.compound_stmt()?,
-            _ => self.expr_stmt()?,
+            TokenPayload::Return => StmtPayload::Return(self.return_stmt()?),
+            TokenPayload::BraceOpen => StmtPayload::Compound(self.compound_stmt()?),
+            _ => StmtPayload::Expr(self.expr_stmt()?),
         };
         Ok(Stmt {
             loc: token.loc,
@@ -118,7 +118,7 @@ impl Parser {
         })
     }
 
-    fn expr_stmt(&mut self) -> Result<StmtPayload, ParseError> {
+    fn expr_stmt(&mut self) -> Result<StmtExpr, ParseError> {
         let expr = self.expr()?;
         let token = self.peek();
         let TokenPayload::Semicolon = &token.payload else {
@@ -129,10 +129,10 @@ impl Parser {
             });
         };
         self.inc_idx();
-        Ok(StmtPayload::Expr(StmtExpr { expr }))
+        Ok(StmtExpr { expr })
     }
 
-    fn return_stmt(&mut self) -> Result<StmtPayload, ParseError> {
+    fn return_stmt(&mut self) -> Result<StmtReturn, ParseError> {
         {
             let token = self.peek();
             let TokenPayload::Return = &token.payload else {
@@ -156,10 +156,10 @@ impl Parser {
             };
             self.inc_idx();
         }
-        Ok(StmtPayload::Return(StmtReturn { expr }))
+        Ok(StmtReturn { expr })
     }
 
-    fn compound_stmt_inner(&mut self) -> Result<Vec<Stmt>, ParseError> {
+    fn compound_stmt(&mut self) -> Result<StmtCompound, ParseError> {
         let mut stmts = vec![];
         {
             let token = self.peek();
@@ -183,24 +183,19 @@ impl Parser {
             }
         }
 
-        Ok(stmts)
-    }
-
-    fn compound_stmt(&mut self) -> Result<StmtPayload, ParseError> {
-        let stmts = self.compound_stmt_inner()?;
-        Ok(StmtPayload::Compound(StmtCompound { stmts }))
+        Ok(StmtCompound { stmts })
     }
 
     fn decl(&mut self) -> Result<Decl, ParseError> {
         let token = self.peek().clone();
-        let payload = self.func_decl()?;
+        let payload = DeclPayload::Func(self.func_decl()?);
         Ok(Decl {
             loc: token.loc,
             payload,
         })
     }
 
-    fn func_decl(&mut self) -> Result<DeclPayload, ParseError> {
+    fn func_decl(&mut self) -> Result<DeclFunc, ParseError> {
         let token = self.peek().clone();
         let TokenPayload::Ident(name) = &token.payload else {
             return Err(ParseError::InvalidToken {
@@ -228,11 +223,11 @@ impl Parser {
             });
         };
         self.inc_idx();
-        let stmts = self.compound_stmt_inner()?;
-        Ok(DeclPayload::Func(DeclFunc {
+        let stmts = self.compound_stmt()?;
+        Ok(DeclFunc {
             name: name.clone(),
-            body: StmtCompound { stmts },
-        }))
+            body: stmts,
+        })
     }
 
     pub fn parse(&mut self) -> Result<Program, ParseError> {

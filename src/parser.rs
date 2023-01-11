@@ -2,15 +2,13 @@ use crate::clang::{
     Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprIntLit, ExprPayload, ExprSub, Program, Stmt,
     StmtCompound, StmtExpr, StmtPayload, StmtReturn,
 };
-use crate::loc::Loc;
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
-#[error("{loc} - {token}: {payload}")]
+#[error("{token}: {payload}")]
 pub struct ParseError {
-    loc: Loc,
     token: Token,
     payload: ParseErrorPayload,
 }
@@ -41,6 +39,19 @@ impl Parser {
         self.tokens.get(self.idx).unwrap()
     }
 
+    fn satisfy<T>(
+        &mut self,
+        f: impl FnOnce(&Token) -> Result<T, ParseErrorPayload>,
+    ) -> Result<T, ParseError> {
+        let token = self.peek().clone();
+        let result = f(&token).map_err(|payload| ParseError {
+            token: token.clone(),
+            payload,
+        })?;
+        self.inc_idx();
+        Ok(result)
+    }
+
     fn primary(&mut self) -> Result<Expr, ParseError> {
         let token = self.peek().clone();
         match token.payload {
@@ -54,21 +65,15 @@ impl Parser {
             TokenPayload::ParenOpen => {
                 self.inc_idx();
                 let expr = self.expr()?;
-                let token = self.peek().clone();
-                let TokenPayload::ParenClose = token.payload else {
-                    return Err(ParseError {
-                        loc: token.loc.clone(),
-                        token: token.clone(),
-                        payload: ParseErrorPayload::UnexpectedToken {
-                            expected: ")".to_string(),
-                        },
-                    });
-                };
-                self.inc_idx();
+                self.satisfy(|token| match token.payload {
+                    TokenPayload::ParenClose => Ok(()),
+                    _ => Err(ParseErrorPayload::UnexpectedToken {
+                        expected: ")".to_string(),
+                    }),
+                })?;
                 Ok(expr)
             }
             _ => Err(ParseError {
-                loc: token.loc.clone(),
                 token,
                 payload: ParseErrorPayload::UnexpectedToken {
                     expected: "int literal".to_string(),
@@ -130,66 +135,40 @@ impl Parser {
 
     fn expr_stmt(&mut self) -> Result<StmtExpr, ParseError> {
         let expr = self.expr()?;
-        let token = self.peek();
-        let TokenPayload::Semicolon = &token.payload else {
-            return Err(ParseError {
-                loc: token.loc.clone(),
-                token: token.clone(),
-                payload: ParseErrorPayload::UnexpectedToken {
-                    expected: ";".to_string(),
-                },
-            });
-        };
-        self.inc_idx();
+        self.satisfy(|token| match token.payload {
+            TokenPayload::Semicolon => Ok(()),
+            _ => Err(ParseErrorPayload::UnexpectedToken {
+                expected: ";".to_string(),
+            }),
+        })?;
         Ok(StmtExpr { expr })
     }
 
     fn return_stmt(&mut self) -> Result<StmtReturn, ParseError> {
-        {
-            let token = self.peek();
-            let TokenPayload::Return = &token.payload else {
-                return Err(ParseError {
-                    loc: token.loc.clone(),
-                    token: token.clone(),
-                    payload: ParseErrorPayload::UnexpectedToken {
-                        expected: "return".to_string(),
-                    },
-                });
-            };
-            self.inc_idx();
-        }
+        self.satisfy(|token| match token.payload {
+            TokenPayload::Return => Ok(()),
+            _ => Err(ParseErrorPayload::UnexpectedToken {
+                expected: "return".to_string(),
+            }),
+        })?;
         let expr = self.expr()?;
-        {
-            let token = self.peek();
-            let TokenPayload::Semicolon = &token.payload else {
-                return Err(ParseError {
-                    loc: token.loc.clone(),
-                    token: token.clone(),
-                    payload: ParseErrorPayload::UnexpectedToken {
-                        expected: ";".to_string(),
-                    },
-                });
-            };
-            self.inc_idx();
-        }
+        self.satisfy(|token| match token.payload {
+            TokenPayload::Semicolon => Ok(()),
+            _ => Err(ParseErrorPayload::UnexpectedToken {
+                expected: ";".to_string(),
+            }),
+        })?;
         Ok(StmtReturn { expr })
     }
 
     fn compound_stmt(&mut self) -> Result<StmtCompound, ParseError> {
         let mut stmts = vec![];
-        {
-            let token = self.peek();
-            let TokenPayload::BraceOpen = &token.payload else {
-                return Err(ParseError {
-                    loc: token.loc.clone(),
-                    token: token.clone(),
-                    payload: ParseErrorPayload::UnexpectedToken {
-                        expected: "{".to_string(),
-                    },
-                });
-            };
-            self.inc_idx();
-        }
+        self.satisfy(|token| match token.payload {
+            TokenPayload::BraceOpen => Ok(()),
+            _ => Err(ParseErrorPayload::UnexpectedToken {
+                expected: "{".to_string(),
+            }),
+        })?;
         loop {
             let token = self.peek();
             match &token.payload {
@@ -214,39 +193,24 @@ impl Parser {
     }
 
     fn func_decl(&mut self) -> Result<DeclFunc, ParseError> {
-        let token = self.peek().clone();
-        let TokenPayload::Ident(name) = &token.payload else {
-            return Err(ParseError {
-                loc: token.loc.clone(),
-                token: token.clone(),
-                payload: ParseErrorPayload::UnexpectedToken {
-                    expected: "identifier".to_string(),
-                },
-            });
-        };
-        self.inc_idx();
-        let token = self.peek();
-        let TokenPayload::ParenOpen = &token.payload else {
-            return Err(ParseError {
-                loc: token.loc.clone(),
-                token: token.clone(),
-                payload: ParseErrorPayload::UnexpectedToken {
-                    expected: "(".to_string(),
-                },
-            });
-        };
-        self.inc_idx();
-        let token = self.peek();
-        let TokenPayload::ParenClose = &token.payload else {
-            return Err(ParseError {
-                loc: token.loc.clone(),
-                token: token.clone(),
-                payload: ParseErrorPayload::UnexpectedToken {
-                    expected: ")".to_string(),
-                },
-            });
-        };
-        self.inc_idx();
+        let name = self.satisfy(|token| match &token.payload {
+            TokenPayload::Ident(name) => Ok(name.clone()),
+            _ => Err(ParseErrorPayload::UnexpectedToken {
+                expected: "identifier".to_string(),
+            }),
+        })?;
+        self.satisfy(|token| match token.payload {
+            TokenPayload::ParenOpen => Ok(()),
+            _ => Err(ParseErrorPayload::UnexpectedToken {
+                expected: "(".to_string(),
+            }),
+        })?;
+        self.satisfy(|token| match token.payload {
+            TokenPayload::ParenClose => Ok(()),
+            _ => Err(ParseErrorPayload::UnexpectedToken {
+                expected: ")".to_string(),
+            }),
+        })?;
         let stmts = self.compound_stmt()?;
         Ok(DeclFunc {
             name: name.clone(),

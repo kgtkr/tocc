@@ -1,7 +1,8 @@
 use crate::loc::Loc;
-use std::fmt;
+use derive_more::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Display)]
+#[display(fmt = "{loc} - {value}")]
 pub struct Token {
     pub payload: TokenPayload,
     pub loc: Loc,
@@ -22,10 +23,4 @@ pub enum TokenPayload {
     EOF,
     Plus,
     Minus,
-}
-
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.value)
-    }
 }

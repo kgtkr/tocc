@@ -251,17 +251,6 @@ rec {
         ];
 
       };
-      "guard" = rec {
-        crateName = "guard";
-        version = "0.5.1";
-        edition = "2015";
-        sha256 = "1slkgi0xj1gqjq44cvg8rc65mg3fq1v47bzvfcxqlkx03v2kr2gz";
-        authors = [
-          "Alex Burka <rust@alexburka.com>"
-        ];
-        features = {
-        };
-      };
       "heck" = rec {
         crateName = "heck";
         version = "0.4.0";
@@ -575,10 +564,6 @@ rec {
             name = "clap";
             packageId = "clap";
             features = [ "derive" ];
-          }
-          {
-            name = "guard";
-            packageId = "guard";
           }
           {
             name = "thiserror";

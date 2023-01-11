@@ -4,7 +4,6 @@ use crate::clang::{
 };
 use crate::loc::Loc;
 use crate::token::{Token, TokenPayload};
-use guard::guard;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
@@ -50,13 +49,13 @@ impl Parser {
                 self.inc_idx();
                 let expr = self.expr()?;
                 let token = self.peek().clone();
-                guard!(let TokenPayload::ParenClose = token.payload else {
+                let TokenPayload::ParenClose = token.payload else {
                     return Err(ParseError::InvalidToken {
                         loc: token.loc.clone(),
                         token: token.clone(),
                         expected: ")".to_string(),
                     });
-                });
+                };
                 self.inc_idx();
                 Ok(expr)
             }
@@ -122,13 +121,13 @@ impl Parser {
     fn expr_stmt(&mut self) -> Result<StmtPayload, ParseError> {
         let expr = self.expr()?;
         let token = self.peek();
-        guard!(let TokenPayload::Semicolon = &token.payload else {
+        let TokenPayload::Semicolon = &token.payload else {
             return Err(ParseError::InvalidToken {
                 loc: token.loc.clone(),
                 token: token.clone(),
                 expected: ";".to_string(),
             });
-        });
+        };
         self.inc_idx();
         Ok(StmtPayload::Expr(StmtExpr { expr }))
     }
@@ -136,25 +135,25 @@ impl Parser {
     fn return_stmt(&mut self) -> Result<StmtPayload, ParseError> {
         {
             let token = self.peek();
-            guard!(let TokenPayload::Return = &token.payload else {
+            let TokenPayload::Return = &token.payload else {
                 return Err(ParseError::InvalidToken {
                     loc: token.loc.clone(),
                     token: token.clone(),
                     expected: "return".to_string(),
                 });
-            });
+            };
             self.inc_idx();
         }
         let expr = self.expr()?;
         {
             let token = self.peek();
-            guard!(let TokenPayload::Semicolon = &token.payload else {
+            let TokenPayload::Semicolon = &token.payload else {
                 return Err(ParseError::InvalidToken {
                     loc: token.loc.clone(),
                     token: token.clone(),
                     expected: ";".to_string(),
                 });
-            });
+            };
             self.inc_idx();
         }
         Ok(StmtPayload::Return(StmtReturn { expr }))
@@ -164,13 +163,13 @@ impl Parser {
         let mut stmts = vec![];
         {
             let token = self.peek();
-            guard!(let TokenPayload::BraceOpen = &token.payload else {
+            let TokenPayload::BraceOpen = &token.payload else {
                 return Err(ParseError::InvalidToken {
                     loc: token.loc.clone(),
                     token: token.clone(),
                     expected: "{".to_string(),
                 });
-            });
+            };
             self.inc_idx();
         }
         loop {
@@ -203,31 +202,31 @@ impl Parser {
 
     fn func_decl(&mut self) -> Result<DeclPayload, ParseError> {
         let token = self.peek().clone();
-        guard!(let TokenPayload::Ident(name) = &token.payload else {
+        let TokenPayload::Ident(name) = &token.payload else {
             return Err(ParseError::InvalidToken {
                 loc: token.loc.clone(),
                 token: token.clone(),
                 expected: "identifier".to_string(),
             });
-        });
+        };
         self.inc_idx();
         let token = self.peek();
-        guard!(let TokenPayload::ParenOpen = &token.payload else {
+        let TokenPayload::ParenOpen = &token.payload else {
             return Err(ParseError::InvalidToken {
                 loc: token.loc.clone(),
                 token: token.clone(),
                 expected: "(".to_string(),
             });
-        });
+        };
         self.inc_idx();
         let token = self.peek();
-        guard!(let TokenPayload::ParenClose = &token.payload else {
+        let TokenPayload::ParenClose = &token.payload else {
             return Err(ParseError::InvalidToken {
                 loc: token.loc.clone(),
                 token: token.clone(),
                 expected: ")".to_string(),
             });
-        });
+        };
         self.inc_idx();
         let stmts = self.compound_stmt_inner()?;
         Ok(DeclPayload::Func(DeclFunc {

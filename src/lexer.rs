@@ -1,6 +1,5 @@
 use crate::loc::Loc;
 use crate::token::{Token, TokenPayload};
-use guard::guard;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
@@ -47,9 +46,9 @@ impl Lexer {
     }
 
     fn expect(&mut self, f: impl Fn(char) -> bool) -> Result<char, LexerError> {
-        guard!(let Some(c) = self.peek() else {
+        let Some(c) = self.peek() else {
             return Err(LexerError::UnexpectedEOF);
-        });
+        };
         if f(c) {
             self.inc_loc();
             Ok(c)

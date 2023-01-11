@@ -6,6 +6,15 @@ use crate::token::{Token, TokenPayload};
 use derive_more::Display;
 use thiserror::Error;
 
+macro_rules! parser_or {
+    ($parser: expr, $f1: expr, $f2: expr,) => {
+        $parser.or($f1, $f2)
+    };
+    ($parser: expr, $f1: expr, $($f: expr,)+) => {
+        $parser.or($f1, |p| parser_or!(p, $($f,)*))
+    };
+}
+
 #[derive(Error, Debug, Clone)]
 #[error("{token}: {payload}")]
 pub struct ParseError {
@@ -50,6 +59,48 @@ impl Parser {
         })?;
         self.inc_idx();
         Ok(result)
+    }
+
+    fn or<T>(
+        &mut self,
+        f1: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+        f2: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let prev_idx = self.idx;
+        match f1(self) {
+            Ok(result) => Ok(result),
+            Err(e1) => {
+                if self.idx != prev_idx {
+                    Err(e1)
+                } else {
+                    match f2(self) {
+                        Ok(result) => Ok(result),
+                        Err(e2) => {
+                            if self.idx != prev_idx {
+                                Err(e2)
+                            } else {
+                                match (e1.payload, e2.payload) {
+                                    (
+                                        ParseErrorPayload::UnexpectedToken {
+                                            expected: expected1,
+                                        },
+                                        ParseErrorPayload::UnexpectedToken {
+                                            expected: expected2,
+                                        },
+                                    ) => Err(ParseError {
+                                        // 普通はe1.token==e2.tokenになるはず
+                                        token: e1.token,
+                                        payload: ParseErrorPayload::UnexpectedToken {
+                                            expected: format!("{}, {}", expected1, expected2),
+                                        },
+                                    }),
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn primary(&mut self) -> Result<Expr, ParseError> {
@@ -122,11 +173,13 @@ impl Parser {
 
     fn stat(&mut self) -> Result<Stmt, ParseError> {
         let token = self.peek().clone();
-        let payload = match &token.payload {
-            TokenPayload::Return => StmtPayload::Return(self.return_stmt()?),
-            TokenPayload::BraceOpen => StmtPayload::Compound(self.compound_stmt()?),
-            _ => StmtPayload::Expr(self.expr_stmt()?),
-        };
+        let payload = parser_or!(
+            self,
+            |p| p.return_stmt().map(StmtPayload::Return),
+            |p| p.compound_stmt().map(StmtPayload::Compound),
+            |p| p.expr_stmt().map(StmtPayload::Expr),
+        )?;
+
         Ok(Stmt {
             loc: token.loc,
             payload,

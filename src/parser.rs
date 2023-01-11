@@ -4,17 +4,23 @@ use crate::clang::{
 };
 use crate::loc::Loc;
 use crate::token::{Token, TokenPayload};
+use derive_more::Display;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
-pub enum ParseError {
-    #[error("{loc} - invalid token: {token}, expected: {expected}")]
-    InvalidToken {
-        loc: Loc,
-        token: Token,
-        expected: String,
-    },
+#[error("{loc} - {token}: {payload}")]
+pub struct ParseError {
+    loc: Loc,
+    token: Token,
+    payload: ParseErrorPayload,
 }
+
+#[derive(Debug, Clone, Display)]
+pub enum ParseErrorPayload {
+    #[display(fmt = "unexpected token, expected: {expected}")]
+    UnexpectedToken { expected: String },
+}
+
 #[derive(Debug)]
 pub struct Parser {
     tokens: Vec<Token>,
@@ -50,19 +56,23 @@ impl Parser {
                 let expr = self.expr()?;
                 let token = self.peek().clone();
                 let TokenPayload::ParenClose = token.payload else {
-                    return Err(ParseError::InvalidToken {
+                    return Err(ParseError {
                         loc: token.loc.clone(),
                         token: token.clone(),
-                        expected: ")".to_string(),
+                        payload: ParseErrorPayload::UnexpectedToken {
+                            expected: ")".to_string(),
+                        },
                     });
                 };
                 self.inc_idx();
                 Ok(expr)
             }
-            _ => Err(ParseError::InvalidToken {
+            _ => Err(ParseError {
                 loc: token.loc.clone(),
                 token,
-                expected: "int literal".to_string(),
+                payload: ParseErrorPayload::UnexpectedToken {
+                    expected: "int literal".to_string(),
+                },
             }),
         }
     }
@@ -122,10 +132,12 @@ impl Parser {
         let expr = self.expr()?;
         let token = self.peek();
         let TokenPayload::Semicolon = &token.payload else {
-            return Err(ParseError::InvalidToken {
+            return Err(ParseError {
                 loc: token.loc.clone(),
                 token: token.clone(),
-                expected: ";".to_string(),
+                payload: ParseErrorPayload::UnexpectedToken {
+                    expected: ";".to_string(),
+                },
             });
         };
         self.inc_idx();
@@ -136,10 +148,12 @@ impl Parser {
         {
             let token = self.peek();
             let TokenPayload::Return = &token.payload else {
-                return Err(ParseError::InvalidToken {
+                return Err(ParseError {
                     loc: token.loc.clone(),
                     token: token.clone(),
-                    expected: "return".to_string(),
+                    payload: ParseErrorPayload::UnexpectedToken {
+                        expected: "return".to_string(),
+                    },
                 });
             };
             self.inc_idx();
@@ -148,10 +162,12 @@ impl Parser {
         {
             let token = self.peek();
             let TokenPayload::Semicolon = &token.payload else {
-                return Err(ParseError::InvalidToken {
+                return Err(ParseError {
                     loc: token.loc.clone(),
                     token: token.clone(),
-                    expected: ";".to_string(),
+                    payload: ParseErrorPayload::UnexpectedToken {
+                        expected: ";".to_string(),
+                    },
                 });
             };
             self.inc_idx();
@@ -164,10 +180,12 @@ impl Parser {
         {
             let token = self.peek();
             let TokenPayload::BraceOpen = &token.payload else {
-                return Err(ParseError::InvalidToken {
+                return Err(ParseError {
                     loc: token.loc.clone(),
                     token: token.clone(),
-                    expected: "{".to_string(),
+                    payload: ParseErrorPayload::UnexpectedToken {
+                        expected: "{".to_string(),
+                    },
                 });
             };
             self.inc_idx();
@@ -198,28 +216,34 @@ impl Parser {
     fn func_decl(&mut self) -> Result<DeclFunc, ParseError> {
         let token = self.peek().clone();
         let TokenPayload::Ident(name) = &token.payload else {
-            return Err(ParseError::InvalidToken {
+            return Err(ParseError {
                 loc: token.loc.clone(),
                 token: token.clone(),
-                expected: "identifier".to_string(),
+                payload: ParseErrorPayload::UnexpectedToken {
+                    expected: "identifier".to_string(),
+                },
             });
         };
         self.inc_idx();
         let token = self.peek();
         let TokenPayload::ParenOpen = &token.payload else {
-            return Err(ParseError::InvalidToken {
+            return Err(ParseError {
                 loc: token.loc.clone(),
                 token: token.clone(),
-                expected: "(".to_string(),
+                payload: ParseErrorPayload::UnexpectedToken {
+                    expected: "(".to_string(),
+                },
             });
         };
         self.inc_idx();
         let token = self.peek();
         let TokenPayload::ParenClose = &token.payload else {
-            return Err(ParseError::InvalidToken {
+            return Err(ParseError {
                 loc: token.loc.clone(),
                 token: token.clone(),
-                expected: ")".to_string(),
+                payload: ParseErrorPayload::UnexpectedToken {
+                    expected: ")".to_string(),
+                },
             });
         };
         self.inc_idx();

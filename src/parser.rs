@@ -77,46 +77,96 @@ impl Parser {
         })
     }
 
+    fn optional_with_error<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<Result<T, ParseError>, ParseError> {
+        let prev_idx = self.idx;
+        match f(self) {
+            Ok(result) => Ok(Ok(result)),
+            Err(e) => {
+                if self.idx != prev_idx {
+                    Err(e)
+                } else {
+                    Ok(Err(e))
+                }
+            }
+        }
+    }
+
+    fn optional<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<Option<T>, ParseError> {
+        self.optional_with_error(f).map(Result::ok)
+    }
+
     fn or<T>(
         &mut self,
         f1: impl FnOnce(&mut Self) -> Result<T, ParseError>,
         f2: impl FnOnce(&mut Self) -> Result<T, ParseError>,
     ) -> Result<T, ParseError> {
-        let prev_idx = self.idx;
-        match f1(self) {
+        match self.optional_with_error(f1)? {
             Ok(result) => Ok(result),
             Err(e1) => {
-                if self.idx != prev_idx {
-                    Err(e1)
-                } else {
-                    match f2(self) {
-                        Ok(result) => Ok(result),
-                        Err(e2) => {
-                            if self.idx != prev_idx {
-                                Err(e2)
-                            } else {
-                                match (e1.payload, e2.payload) {
-                                    (
-                                        ParseErrorPayload::UnexpectedToken {
-                                            expected: expected1,
-                                        },
-                                        ParseErrorPayload::UnexpectedToken {
-                                            expected: expected2,
-                                        },
-                                    ) => Err(ParseError {
-                                        // 普通はe1.token==e2.tokenになるはず
-                                        token: e1.token,
-                                        payload: ParseErrorPayload::UnexpectedToken {
-                                            expected: format!("{}, {}", expected1, expected2),
-                                        },
-                                    }),
-                                }
-                            }
+                match self.optional_with_error(f2)? {
+                    Ok(result) => Ok(result),
+                    Err(e2) => {
+                        match (e1.payload, e2.payload) {
+                            (
+                                ParseErrorPayload::UnexpectedToken {
+                                    expected: expected1,
+                                },
+                                ParseErrorPayload::UnexpectedToken {
+                                    expected: expected2,
+                                },
+                            ) => Err(ParseError {
+                                // 普通はe1.token==e2.tokenになるはず
+                                token: e1.token,
+                                payload: ParseErrorPayload::UnexpectedToken {
+                                    expected: format!("{}, {}", expected1, expected2),
+                                },
+                            }),
                         }
                     }
                 }
             }
         }
+    }
+
+    fn fold<T, R>(
+        &mut self,
+        f: impl Fn(&mut Self) -> Result<T, ParseError>,
+        init: R,
+        fold: impl Fn(R, T) -> R,
+    ) -> Result<R, ParseError> {
+        let mut result = init;
+        loop {
+            match self.optional(|p| f(p))? {
+                Some(t) => result = fold(result, t),
+                None => break,
+            }
+        }
+        Ok(result)
+    }
+
+    fn fold1<T>(
+        &mut self,
+        f: impl Fn(&mut Self) -> Result<T, ParseError>,
+        fold: impl Fn(T, T) -> T,
+    ) -> Result<T, ParseError> {
+        let first = f(self)?;
+        self.fold(f, first, fold)
+    }
+
+    fn many<T>(
+        &mut self,
+        f: impl Fn(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<Vec<T>, ParseError> {
+        self.fold(f, Vec::new(), |mut v, t| {
+            v.push(t);
+            v
+        })
     }
 
     fn primary(&mut self) -> Result<Expr, ParseError> {
@@ -147,25 +197,25 @@ impl Parser {
     }
 
     fn unary(&mut self) -> Result<Expr, ParseError> {
-        let token = self.peek().clone();
-        match token.payload {
-            TokenPayload::Plus => {
-                self.inc_idx();
-                let expr = self.primary()?;
+        parser_or!(
+            self,
+            |p| {
+                p.satisfy_(|token| matches!(token.payload, TokenPayload::Plus), "+")?;
+                let expr = p.primary()?;
                 Ok(expr)
-            }
-            TokenPayload::Minus => {
-                self.inc_idx();
-                let expr = self.primary()?;
+            },
+            |p| {
+                p.satisfy_(|token| matches!(token.payload, TokenPayload::Minus), "-")?;
+                let expr = p.primary()?;
                 Ok(Expr {
-                    loc: token.loc,
+                    loc: expr.loc.clone(),
                     payload: ExprPayload::Neg(ExprNeg {
                         expr: Box::new(expr),
                     }),
                 })
-            }
-            _ => self.primary(),
-        }
+            },
+            |p| p.primary(),
+        )
     }
 
     fn muldiv(&mut self) -> Result<Expr, ParseError> {

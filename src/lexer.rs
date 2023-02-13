@@ -105,6 +105,8 @@ impl Lexer {
             ';' => Some(TokenPayload::Semicolon),
             '+' => Some(TokenPayload::Plus),
             '-' => Some(TokenPayload::Minus),
+            '*' => Some(TokenPayload::Asterisk),
+            '/' => Some(TokenPayload::Slash),
             ' ' | '\t' | '\r' | '\n' => None,
             _ => return Err(LexerError::InvalidCharacter { loc: begin_loc, c }),
         };

@@ -23,4 +23,6 @@ pub enum TokenPayload {
     EOF,
     Plus,
     Minus,
+    Asterisk,
+    Slash,
 }

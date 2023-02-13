@@ -1,6 +1,6 @@
 use crate::clang::{
-    Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprIntLit, ExprPayload, ExprSub, Program, Stmt,
-    StmtCompound, StmtExpr, StmtPayload, StmtReturn,
+    Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprDiv, ExprIntLit, ExprMul, ExprPayload, ExprSub,
+    Program, Stmt, StmtCompound, StmtExpr, StmtPayload, StmtReturn,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -133,14 +133,47 @@ impl Parser {
         }
     }
 
-    fn addsub(&mut self) -> Result<Expr, ParseError> {
+    fn muldiv(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.primary()?;
+        loop {
+            let token = self.peek().clone();
+            match token.payload {
+                TokenPayload::Asterisk => {
+                    self.inc_idx();
+                    let rhs = self.primary()?;
+                    expr = Expr {
+                        loc: token.loc,
+                        payload: ExprPayload::Mul(ExprMul {
+                            lhs: Box::new(expr),
+                            rhs: Box::new(rhs),
+                        }),
+                    };
+                }
+                TokenPayload::Slash => {
+                    self.inc_idx();
+                    let rhs = self.primary()?;
+                    expr = Expr {
+                        loc: token.loc,
+                        payload: ExprPayload::Div(ExprDiv {
+                            lhs: Box::new(expr),
+                            rhs: Box::new(rhs),
+                        }),
+                    };
+                }
+                _ => break,
+            }
+        }
+        Ok(expr)
+    }
+
+    fn addsub(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.muldiv()?;
         loop {
             let token = self.peek().clone();
             match token.payload {
                 TokenPayload::Plus => {
                     self.inc_idx();
-                    let rhs = self.primary()?;
+                    let rhs = self.muldiv()?;
                     expr = Expr {
                         loc: token.loc,
                         payload: ExprPayload::Add(ExprAdd {
@@ -151,7 +184,7 @@ impl Parser {
                 }
                 TokenPayload::Minus => {
                     self.inc_idx();
-                    let rhs = self.primary()?;
+                    let rhs = self.muldiv()?;
                     expr = Expr {
                         loc: token.loc,
                         payload: ExprPayload::Sub(ExprSub {

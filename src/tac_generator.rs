@@ -61,6 +61,8 @@ impl InstrGenerator {
             IntLit(x) => self.expr_int_lit(expr.loc, x),
             Add(x) => self.expr_add(expr.loc, x),
             Sub(x) => self.expr_sub(expr.loc, x),
+            Mul(x) => self.expr_mul(expr.loc, x),
+            Div(x) => self.expr_div(expr.loc, x),
         }
     }
 
@@ -94,6 +96,28 @@ impl InstrGenerator {
         self.instrs.push(tac::Instr {
             loc,
             payload: tac::InstrPayload::Sub(tac::InstrSub { dst, lhs, rhs }),
+        });
+        dst
+    }
+
+    fn expr_mul(&mut self, loc: Loc, x: clang::ExprMul) -> usize {
+        let dst = self.generate_local();
+        let lhs = self.expr(*x.lhs);
+        let rhs = self.expr(*x.rhs);
+        self.instrs.push(tac::Instr {
+            loc,
+            payload: tac::InstrPayload::Mul(tac::InstrMul { dst, lhs, rhs }),
+        });
+        dst
+    }
+
+    fn expr_div(&mut self, loc: Loc, x: clang::ExprDiv) -> usize {
+        let dst = self.generate_local();
+        let lhs = self.expr(*x.lhs);
+        let rhs = self.expr(*x.rhs);
+        self.instrs.push(tac::Instr {
+            loc,
+            payload: tac::InstrPayload::Div(tac::InstrDiv { dst, lhs, rhs }),
         });
         dst
     }

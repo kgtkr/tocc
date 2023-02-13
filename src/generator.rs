@@ -58,6 +58,8 @@ impl Generator {
             IntConst(x) => self.instr_int_const(x),
             Add(x) => self.instr_add(x),
             Sub(x) => self.instr_sub(x),
+            Mul(x) => self.instr_mul(x),
+            Div(x) => self.instr_div(x),
         }
     }
 
@@ -89,6 +91,27 @@ impl Generator {
         self.output
             .append(format!("mov rdi, {}\n", Self::local(x.rhs)));
         self.output.append("sub rax, rdi\n");
+        self.output
+            .append(format!("mov {}, rax\n", Self::local(x.dst)));
+    }
+
+    fn instr_mul(&mut self, x: tac::InstrMul) {
+        self.output
+            .append(format!("mov rax, {}\n", Self::local(x.lhs)));
+        self.output
+            .append(format!("mov rdi, {}\n", Self::local(x.rhs)));
+        self.output.append("imul rax, rdi\n");
+        self.output
+            .append(format!("mov {}, rax\n", Self::local(x.dst)));
+    }
+
+    fn instr_div(&mut self, x: tac::InstrDiv) {
+        self.output
+            .append(format!("mov rax, {}\n", Self::local(x.lhs)));
+        self.output
+            .append(format!("mov rdi, {}\n", Self::local(x.rhs)));
+        self.output.append("cqo\n");
+        self.output.append("idiv rdi\n");
         self.output
             .append(format!("mov {}, rax\n", Self::local(x.dst)));
     }

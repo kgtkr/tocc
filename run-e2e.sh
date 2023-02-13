@@ -14,12 +14,12 @@ wait_jobs() {
 check() {
   NAME="$1"
   DIR="fixtures/$NAME"
-  FAILMSG="\e[31mFAIL\e[0m $NAME"
+  FAILMSG=$(printf "\e[31mFAIL\e[0m $NAME")
 
   set +e
   MAKE_RESULT=$(make "$DIR/main.out")
   if [ "$?" != "0" ]; then
-    echo -e "$FAILMSG"
+    echo $FAILMSG
     echo "Make failed"
     echo "$MAKE_RESULT"
     exit 1
@@ -46,7 +46,7 @@ check() {
     set +e
     diff "$DIR/stdout" "$DIR/stdout.actual"
     if [ "$?" != "0" ]; then
-      echo -e "$FAILMSG"
+      echo "$FAILMSG"
       echo "Stdout is not as expected"
       exit 1
     fi
@@ -57,7 +57,7 @@ check() {
     set +e
     diff "$DIR/stderr" "$DIR/stderr.actual"
     if [ "$?" != "0" ]; then
-      echo -e "$FAILMSG"
+      echo "$FAILMSG"
       echo "Stderr is not as expected"
       exit 1
     fi
@@ -71,11 +71,11 @@ check() {
   fi
 
   if [ "$ACTUAL_STATUS" != "$EXPECTED_STATUS" ]; then
-    echo -e "$FAILMSG"
+    echo "$FAILMSG"
     echo "Status code: expected to be $EXPECTED_STATUS, but got $ACTUAL_STATUS"
     exit 1
   fi
-  echo -e "\e[32mPASS\e[0m $NAME"
+  printf "\e[32mPASS\e[0m %s $NAME\n"
 }
 
 make target/debug/tocc

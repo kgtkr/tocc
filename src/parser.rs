@@ -61,6 +61,22 @@ impl Parser {
         Ok(result)
     }
 
+    fn satisfy_(
+        &mut self,
+        f: impl FnOnce(&Token) -> bool,
+        expected: impl ToString,
+    ) -> Result<(), ParseError> {
+        self.satisfy(|token| {
+            if f(token) {
+                Ok(())
+            } else {
+                Err(ParseErrorPayload::UnexpectedToken {
+                    expected: expected.to_string(),
+                })
+            }
+        })
+    }
+
     fn or<T>(
         &mut self,
         f1: impl FnOnce(&mut Self) -> Result<T, ParseError>,
@@ -104,33 +120,30 @@ impl Parser {
     }
 
     fn primary(&mut self) -> Result<Expr, ParseError> {
-        let token = self.peek().clone();
-        match token.payload {
-            TokenPayload::IntLit(i) => {
-                self.inc_idx();
-                Ok(Expr {
-                    loc: token.loc,
+        parser_or!(
+            self,
+            |p| p.satisfy(|token| match token.payload {
+                TokenPayload::IntLit(i) => Ok(Expr {
+                    loc: token.loc.clone(),
                     payload: ExprPayload::IntLit(ExprIntLit { value: i }),
-                })
-            }
-            TokenPayload::ParenOpen => {
-                self.inc_idx();
-                let expr = self.expr()?;
-                self.satisfy(|token| match token.payload {
-                    TokenPayload::ParenClose => Ok(()),
-                    _ => Err(ParseErrorPayload::UnexpectedToken {
-                        expected: ")".to_string(),
-                    }),
-                })?;
-                Ok(expr)
-            }
-            _ => Err(ParseError {
-                token,
-                payload: ParseErrorPayload::UnexpectedToken {
+                }),
+                _ => Err(ParseErrorPayload::UnexpectedToken {
                     expected: "int literal".to_string(),
-                },
+                }),
             }),
-        }
+            |p| {
+                p.satisfy_(
+                    |token| matches!(token.payload, TokenPayload::ParenOpen),
+                    "(",
+                )?;
+                let expr = p.expr()?;
+                p.satisfy_(
+                    |token| matches!(token.payload, TokenPayload::ParenClose),
+                    ")",
+                )?;
+                Ok(expr)
+            },
+        )
     }
 
     fn unary(&mut self) -> Result<Expr, ParseError> {

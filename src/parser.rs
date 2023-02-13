@@ -150,15 +150,6 @@ impl Parser {
         Ok(result)
     }
 
-    fn fold1<T>(
-        &mut self,
-        f: impl Fn(&mut Self) -> Result<T, ParseError>,
-        fold: impl Fn(T, T) -> T,
-    ) -> Result<T, ParseError> {
-        let first = f(self)?;
-        self.fold(f, first, fold)
-    }
-
     fn many<T>(
         &mut self,
         f: impl Fn(&mut Self) -> Result<T, ParseError>,
@@ -219,69 +210,87 @@ impl Parser {
     }
 
     fn muldiv(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.unary()?;
-        loop {
-            let token = self.peek().clone();
-            match token.payload {
-                TokenPayload::Asterisk => {
-                    self.inc_idx();
-                    let rhs = self.unary()?;
-                    expr = Expr {
-                        loc: token.loc,
-                        payload: ExprPayload::Mul(ExprMul {
-                            lhs: Box::new(expr),
-                            rhs: Box::new(rhs),
-                        }),
-                    };
-                }
-                TokenPayload::Slash => {
-                    self.inc_idx();
-                    let rhs = self.unary()?;
-                    expr = Expr {
-                        loc: token.loc,
-                        payload: ExprPayload::Div(ExprDiv {
-                            lhs: Box::new(expr),
-                            rhs: Box::new(rhs),
-                        }),
-                    };
-                }
-                _ => break,
-            }
+        enum Op {
+            Mul,
+            Div,
         }
-        Ok(expr)
+        let expr = self.unary()?;
+        self.fold(
+            |p| {
+                parser_or!(
+                    p,
+                    |p| {
+                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Asterisk), "*")?;
+                        let rhs = p.unary()?;
+                        Ok((Op::Mul, rhs))
+                    },
+                    |p| {
+                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Slash), "/")?;
+                        let rhs = p.unary()?;
+                        Ok((Op::Div, rhs))
+                    },
+                )
+            },
+            expr,
+            |expr, (op, rhs)| match op {
+                Op::Mul => Expr {
+                    loc: expr.loc.clone(),
+                    payload: ExprPayload::Mul(ExprMul {
+                        lhs: Box::new(expr),
+                        rhs: Box::new(rhs),
+                    }),
+                },
+                Op::Div => Expr {
+                    loc: expr.loc.clone(),
+                    payload: ExprPayload::Div(ExprDiv {
+                        lhs: Box::new(expr),
+                        rhs: Box::new(rhs),
+                    }),
+                },
+            },
+        )
     }
 
     fn addsub(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.muldiv()?;
-        loop {
-            let token = self.peek().clone();
-            match token.payload {
-                TokenPayload::Plus => {
-                    self.inc_idx();
-                    let rhs = self.muldiv()?;
-                    expr = Expr {
-                        loc: token.loc,
-                        payload: ExprPayload::Add(ExprAdd {
-                            lhs: Box::new(expr),
-                            rhs: Box::new(rhs),
-                        }),
-                    };
-                }
-                TokenPayload::Minus => {
-                    self.inc_idx();
-                    let rhs = self.muldiv()?;
-                    expr = Expr {
-                        loc: token.loc,
-                        payload: ExprPayload::Sub(ExprSub {
-                            lhs: Box::new(expr),
-                            rhs: Box::new(rhs),
-                        }),
-                    };
-                }
-                _ => break,
-            }
+        enum Op {
+            Add,
+            Sub,
         }
-        Ok(expr)
+        let expr = self.muldiv()?;
+        self.fold(
+            |p| {
+                parser_or!(
+                    p,
+                    |p| {
+                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Plus), "+")?;
+                        let rhs = p.muldiv()?;
+                        Ok((Op::Add, rhs))
+                    },
+                    |p| {
+                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Minus), "-")?;
+                        let rhs = p.muldiv()?;
+                        Ok((Op::Sub, rhs))
+                    },
+                )
+            },
+            expr,
+            |expr, (op, rhs)| match op {
+                Op::Add => Expr {
+                    loc: expr.loc.clone(),
+                    payload: ExprPayload::Add(ExprAdd {
+                        lhs: Box::new(expr),
+                        rhs: Box::new(rhs),
+                    }),
+                },
+                Op::Sub => Expr {
+                    loc: expr.loc.clone(),
+                    payload: ExprPayload::Sub(ExprSub {
+                        lhs: Box::new(expr),
+                        rhs: Box::new(rhs),
+                    }),
+                },
+            },
+        )
     }
 
     fn expr(&mut self) -> Result<Expr, ParseError> {
@@ -306,50 +315,36 @@ impl Parser {
 
     fn expr_stmt(&mut self) -> Result<StmtExpr, ParseError> {
         let expr = self.expr()?;
-        self.satisfy(|token| match token.payload {
-            TokenPayload::Semicolon => Ok(()),
-            _ => Err(ParseErrorPayload::UnexpectedToken {
-                expected: ";".to_string(),
-            }),
-        })?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::Semicolon),
+            ";",
+        )?;
         Ok(StmtExpr { expr })
     }
 
     fn return_stmt(&mut self) -> Result<StmtReturn, ParseError> {
-        self.satisfy(|token| match token.payload {
-            TokenPayload::Return => Ok(()),
-            _ => Err(ParseErrorPayload::UnexpectedToken {
-                expected: "return".to_string(),
-            }),
-        })?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::Return),
+            "return",
+        )?;
         let expr = self.expr()?;
-        self.satisfy(|token| match token.payload {
-            TokenPayload::Semicolon => Ok(()),
-            _ => Err(ParseErrorPayload::UnexpectedToken {
-                expected: ";".to_string(),
-            }),
-        })?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::Semicolon),
+            ";",
+        )?;
         Ok(StmtReturn { expr })
     }
 
     fn compound_stmt(&mut self) -> Result<StmtCompound, ParseError> {
-        let mut stmts = vec![];
-        self.satisfy(|token| match token.payload {
-            TokenPayload::BraceOpen => Ok(()),
-            _ => Err(ParseErrorPayload::UnexpectedToken {
-                expected: "{".to_string(),
-            }),
-        })?;
-        loop {
-            let token = self.peek();
-            match &token.payload {
-                TokenPayload::BraceClose => {
-                    self.inc_idx();
-                    break;
-                }
-                _ => stmts.push(self.stat()?),
-            }
-        }
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::BraceOpen),
+            "{",
+        )?;
+        let stmts = self.many(|p| p.stat())?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::BraceClose),
+            "}",
+        )?;
 
         Ok(StmtCompound { stmts })
     }
@@ -390,16 +385,8 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Program, ParseError> {
-        let mut decls = vec![];
-        loop {
-            let token = self.peek();
-            match &token.payload {
-                TokenPayload::EOF => {
-                    self.inc_idx();
-                    return Ok(Program { decls });
-                }
-                _ => decls.push(self.decl()?),
-            }
-        }
+        let decls = self.many(|p| p.decl())?;
+        self.satisfy_(|token| matches!(token.payload, TokenPayload::EOF), "EOF")?;
+        Ok(Program { decls })
     }
 }

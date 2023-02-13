@@ -17,6 +17,8 @@ impl Generator {
         for decl in program.decls {
             self.decl(decl);
         }
+        self.output
+            .append(".section .note.GNU-stack, \"\", @progbits\n");
     }
 
     fn decl(&mut self, decl: Decl) {

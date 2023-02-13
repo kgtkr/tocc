@@ -63,6 +63,7 @@ pub enum ExprPayload {
     Sub(ExprSub),
     Mul(ExprMul),
     Div(ExprDiv),
+    Neg(ExprNeg),
 }
 
 #[derive(Debug, Clone)]
@@ -92,4 +93,9 @@ pub struct ExprMul {
 pub struct ExprDiv {
     pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprNeg {
+    pub expr: Box<Expr>,
 }

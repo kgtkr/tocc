@@ -63,6 +63,7 @@ impl InstrGenerator {
             Sub(x) => self.expr_sub(expr.loc, x),
             Mul(x) => self.expr_mul(expr.loc, x),
             Div(x) => self.expr_div(expr.loc, x),
+            Neg(x) => self.expr_neg(expr.loc, x),
         }
     }
 
@@ -118,6 +119,16 @@ impl InstrGenerator {
         self.instrs.push(tac::Instr {
             loc,
             payload: tac::InstrPayload::Div(tac::InstrDiv { dst, lhs, rhs }),
+        });
+        dst
+    }
+
+    fn expr_neg(&mut self, loc: Loc, x: clang::ExprNeg) -> usize {
+        let dst = self.generate_local();
+        let src = self.expr(*x.expr);
+        self.instrs.push(tac::Instr {
+            loc,
+            payload: tac::InstrPayload::Neg(tac::InstrNeg { dst, src }),
         });
         dst
     }

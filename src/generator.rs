@@ -60,6 +60,7 @@ impl Generator {
             Sub(x) => self.instr_sub(x),
             Mul(x) => self.instr_mul(x),
             Div(x) => self.instr_div(x),
+            Neg(x) => self.instr_neg(x),
         }
     }
 
@@ -112,6 +113,14 @@ impl Generator {
             .append(format!("mov edi, {}\n", Self::local(x.rhs)));
         self.output.append("cqo\n");
         self.output.append("idiv edi\n");
+        self.output
+            .append(format!("mov {}, eax\n", Self::local(x.dst)));
+    }
+
+    fn instr_neg(&mut self, x: tac::InstrNeg) {
+        self.output
+            .append(format!("mov eax, {}\n", Self::local(x.src)));
+        self.output.append("neg eax\n");
         self.output
             .append(format!("mov {}, eax\n", Self::local(x.dst)));
     }

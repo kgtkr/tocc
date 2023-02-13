@@ -37,6 +37,7 @@ pub enum InstrPayload {
     Sub(InstrSub),
     Mul(InstrMul),
     Div(InstrDiv),
+    Neg(InstrNeg),
 }
 
 #[derive(Debug, Clone)]
@@ -76,4 +77,10 @@ pub struct InstrDiv {
     pub dst: usize,
     pub lhs: usize,
     pub rhs: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrNeg {
+    pub dst: usize,
+    pub src: usize,
 }

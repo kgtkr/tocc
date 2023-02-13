@@ -34,7 +34,7 @@ impl Generator {
         self.output.append(format!("{}:\n", x.name));
         self.output.append("push rbp\n");
         self.output.append("mov rbp, rsp\n");
-        let locals_len = x.locals_count * 8;
+        let locals_len = x.locals_count * 4;
         let locals_pad = if locals_len % 16 == 0 {
             0
         } else {
@@ -48,7 +48,7 @@ impl Generator {
     }
 
     fn local(local: usize) -> String {
-        format!("QWORD PTR [rbp-{}]", local * 8 + 8)
+        format!("DWORD PTR [rbp-{}]", local * 4 + 8)
     }
 
     fn instr(&mut self, instr: Instr) {
@@ -65,7 +65,7 @@ impl Generator {
 
     fn instr_return(&mut self, x: InstrReturn) {
         self.output
-            .append(format!("mov rax, {}\n", Self::local(x.src)));
+            .append(format!("mov eax, {}\n", Self::local(x.src)));
         self.output.append("leave\n");
         self.output.append("ret\n");
     }
@@ -77,43 +77,43 @@ impl Generator {
 
     fn instr_add(&mut self, x: tac::InstrAdd) {
         self.output
-            .append(format!("mov rax, {}\n", Self::local(x.lhs)));
+            .append(format!("mov eax, {}\n", Self::local(x.lhs)));
         self.output
-            .append(format!("mov rdi, {}\n", Self::local(x.rhs)));
+            .append(format!("mov edi, {}\n", Self::local(x.rhs)));
         self.output.append("add rax, rdi\n");
         self.output
-            .append(format!("mov {}, rax\n", Self::local(x.dst)));
+            .append(format!("mov {}, eax\n", Self::local(x.dst)));
     }
 
     fn instr_sub(&mut self, x: tac::InstrSub) {
         self.output
-            .append(format!("mov rax, {}\n", Self::local(x.lhs)));
+            .append(format!("mov eax, {}\n", Self::local(x.lhs)));
         self.output
-            .append(format!("mov rdi, {}\n", Self::local(x.rhs)));
+            .append(format!("mov edi, {}\n", Self::local(x.rhs)));
         self.output.append("sub rax, rdi\n");
         self.output
-            .append(format!("mov {}, rax\n", Self::local(x.dst)));
+            .append(format!("mov {}, eax\n", Self::local(x.dst)));
     }
 
     fn instr_mul(&mut self, x: tac::InstrMul) {
         self.output
-            .append(format!("mov rax, {}\n", Self::local(x.lhs)));
+            .append(format!("mov eax, {}\n", Self::local(x.lhs)));
         self.output
-            .append(format!("mov rdi, {}\n", Self::local(x.rhs)));
+            .append(format!("mov edi, {}\n", Self::local(x.rhs)));
         self.output.append("imul rax, rdi\n");
         self.output
-            .append(format!("mov {}, rax\n", Self::local(x.dst)));
+            .append(format!("mov {}, eax\n", Self::local(x.dst)));
     }
 
     fn instr_div(&mut self, x: tac::InstrDiv) {
         self.output
-            .append(format!("mov rax, {}\n", Self::local(x.lhs)));
+            .append(format!("mov eax, {}\n", Self::local(x.lhs)));
         self.output
-            .append(format!("mov rdi, {}\n", Self::local(x.rhs)));
+            .append(format!("mov edi, {}\n", Self::local(x.rhs)));
         self.output.append("cqo\n");
-        self.output.append("idiv rdi\n");
+        self.output.append("idiv edi\n");
         self.output
-            .append(format!("mov {}, rax\n", Self::local(x.dst)));
+            .append(format!("mov {}, eax\n", Self::local(x.dst)));
     }
 }
 

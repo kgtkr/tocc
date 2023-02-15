@@ -1,6 +1,7 @@
 use crate::clang::{
-    Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprDiv, ExprIntLit, ExprMul, ExprNeg, ExprPayload,
-    ExprSub, Program, Stmt, StmtCompound, StmtExpr, StmtPayload, StmtReturn,
+    Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprDiv, ExprEq, ExprGe, ExprGt, ExprIntLit,
+    ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload, ExprSub, Program, Stmt, StmtCompound,
+    StmtExpr, StmtPayload, StmtReturn,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -293,8 +294,118 @@ impl Parser {
         )
     }
 
-    fn expr(&mut self) -> Result<Expr, ParseError> {
+    fn relational(&mut self) -> Result<Expr, ParseError> {
+        enum Op {
+            Lt,
+            Gt,
+            Le,
+            Ge,
+        }
         let expr = self.addsub()?;
+        self.fold(
+            |p| {
+                parser_or!(
+                    p,
+                    |p| {
+                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Lt), "<")?;
+                        let rhs = p.addsub()?;
+                        Ok((Op::Lt, rhs))
+                    },
+                    |p| {
+                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Gt), ">")?;
+                        let rhs = p.addsub()?;
+                        Ok((Op::Gt, rhs))
+                    },
+                    |p| {
+                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Le), "<=")?;
+                        let rhs = p.addsub()?;
+                        Ok((Op::Le, rhs))
+                    },
+                    |p| {
+                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Ge), ">=")?;
+                        let rhs = p.addsub()?;
+                        Ok((Op::Ge, rhs))
+                    },
+                )
+            },
+            expr,
+            |expr, (op, rhs)| match op {
+                Op::Lt => Expr {
+                    loc: expr.loc.clone(),
+                    payload: ExprPayload::Lt(ExprLt {
+                        lhs: Box::new(expr),
+                        rhs: Box::new(rhs),
+                    }),
+                },
+                Op::Gt => Expr {
+                    loc: expr.loc.clone(),
+                    payload: ExprPayload::Gt(ExprGt {
+                        lhs: Box::new(expr),
+                        rhs: Box::new(rhs),
+                    }),
+                },
+                Op::Le => Expr {
+                    loc: expr.loc.clone(),
+                    payload: ExprPayload::Le(ExprLe {
+                        lhs: Box::new(expr),
+                        rhs: Box::new(rhs),
+                    }),
+                },
+                Op::Ge => Expr {
+                    loc: expr.loc.clone(),
+                    payload: ExprPayload::Ge(ExprGe {
+                        lhs: Box::new(expr),
+                        rhs: Box::new(rhs),
+                    }),
+                },
+            },
+        )
+    }
+
+    fn equality(&mut self) -> Result<Expr, ParseError> {
+        enum Op {
+            Eq,
+            Ne,
+        }
+        let expr = self.relational()?;
+        self.fold(
+            |p| {
+                parser_or!(
+                    p,
+                    |p| {
+                        p.satisfy_(|token| matches!(token.payload, TokenPayload::EqEq), "==")?;
+                        let rhs = p.relational()?;
+                        Ok((Op::Eq, rhs))
+                    },
+                    |p| {
+                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Neq), "!=")?;
+                        let rhs = p.relational()?;
+                        Ok((Op::Ne, rhs))
+                    },
+                )
+            },
+            expr,
+            |expr, (op, rhs)| match op {
+                Op::Eq => Expr {
+                    loc: expr.loc.clone(),
+                    payload: ExprPayload::Eq(ExprEq {
+                        lhs: Box::new(expr),
+                        rhs: Box::new(rhs),
+                    }),
+                },
+                Op::Ne => Expr {
+                    loc: expr.loc.clone(),
+                    payload: ExprPayload::Ne(ExprNe {
+                        lhs: Box::new(expr),
+                        rhs: Box::new(rhs),
+                    }),
+                },
+            },
+        )
+    }
+
+    fn expr(&mut self) -> Result<Expr, ParseError> {
+        let expr = self.equality()?;
         Ok(expr)
     }
 

@@ -38,6 +38,10 @@ pub enum InstrPayload {
     Mul(InstrMul),
     Div(InstrDiv),
     Neg(InstrNeg),
+    Eq(InstrEq),
+    Ne(InstrNe),
+    Lt(InstrLt),
+    Le(InstrLe),
 }
 
 #[derive(Debug, Clone)]
@@ -83,4 +87,32 @@ pub struct InstrDiv {
 pub struct InstrNeg {
     pub dst: usize,
     pub src: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrEq {
+    pub dst: usize,
+    pub lhs: usize,
+    pub rhs: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrNe {
+    pub dst: usize,
+    pub lhs: usize,
+    pub rhs: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrLt {
+    pub dst: usize,
+    pub lhs: usize,
+    pub rhs: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrLe {
+    pub dst: usize,
+    pub lhs: usize,
+    pub rhs: usize,
 }

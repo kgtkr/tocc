@@ -25,4 +25,10 @@ pub enum TokenPayload {
     Minus,
     Asterisk,
     Slash,
+    EqEq,
+    Neq,
+    Lt,
+    Le,
+    Gt,
+    Ge,
 }

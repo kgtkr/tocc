@@ -64,6 +64,12 @@ impl InstrGenerator {
             Mul(x) => self.expr_mul(expr.loc, x),
             Div(x) => self.expr_div(expr.loc, x),
             Neg(x) => self.expr_neg(expr.loc, x),
+            Eq(x) => self.expr_eq(expr.loc, x),
+            Ne(x) => self.expr_ne(expr.loc, x),
+            Lt(x) => self.expr_lt(expr.loc, x),
+            Le(x) => self.expr_le(expr.loc, x),
+            Gt(x) => self.expr_gt(expr.loc, x),
+            Ge(x) => self.expr_ge(expr.loc, x),
         }
     }
 
@@ -129,6 +135,80 @@ impl InstrGenerator {
         self.instrs.push(tac::Instr {
             loc,
             payload: tac::InstrPayload::Neg(tac::InstrNeg { dst, src }),
+        });
+        dst
+    }
+
+    fn expr_eq(&mut self, loc: Loc, x: clang::ExprEq) -> usize {
+        let dst = self.generate_local();
+        let lhs = self.expr(*x.lhs);
+        let rhs = self.expr(*x.rhs);
+        self.instrs.push(tac::Instr {
+            loc,
+            payload: tac::InstrPayload::Eq(tac::InstrEq { dst, lhs, rhs }),
+        });
+        dst
+    }
+
+    fn expr_ne(&mut self, loc: Loc, x: clang::ExprNe) -> usize {
+        let dst = self.generate_local();
+        let lhs = self.expr(*x.lhs);
+        let rhs = self.expr(*x.rhs);
+        self.instrs.push(tac::Instr {
+            loc,
+            payload: tac::InstrPayload::Ne(tac::InstrNe { dst, lhs, rhs }),
+        });
+        dst
+    }
+
+    fn expr_lt(&mut self, loc: Loc, x: clang::ExprLt) -> usize {
+        let dst = self.generate_local();
+        let lhs = self.expr(*x.lhs);
+        let rhs = self.expr(*x.rhs);
+        self.instrs.push(tac::Instr {
+            loc,
+            payload: tac::InstrPayload::Lt(tac::InstrLt { dst, lhs, rhs }),
+        });
+        dst
+    }
+
+    fn expr_le(&mut self, loc: Loc, x: clang::ExprLe) -> usize {
+        let dst = self.generate_local();
+        let lhs = self.expr(*x.lhs);
+        let rhs = self.expr(*x.rhs);
+        self.instrs.push(tac::Instr {
+            loc,
+            payload: tac::InstrPayload::Le(tac::InstrLe { dst, lhs, rhs }),
+        });
+        dst
+    }
+
+    fn expr_gt(&mut self, loc: Loc, x: clang::ExprGt) -> usize {
+        let dst = self.generate_local();
+        let lhs = self.expr(*x.lhs);
+        let rhs = self.expr(*x.rhs);
+        self.instrs.push(tac::Instr {
+            loc,
+            payload: tac::InstrPayload::Lt(tac::InstrLt {
+                dst,
+                lhs: rhs,
+                rhs: lhs,
+            }),
+        });
+        dst
+    }
+
+    fn expr_ge(&mut self, loc: Loc, x: clang::ExprGe) -> usize {
+        let dst = self.generate_local();
+        let lhs = self.expr(*x.lhs);
+        let rhs = self.expr(*x.rhs);
+        self.instrs.push(tac::Instr {
+            loc,
+            payload: tac::InstrPayload::Le(tac::InstrLe {
+                dst,
+                lhs: rhs,
+                rhs: lhs,
+            }),
         });
         dst
     }

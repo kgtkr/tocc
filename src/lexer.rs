@@ -107,6 +107,28 @@ impl Lexer {
             '-' => Some(TokenPayload::Minus),
             '*' => Some(TokenPayload::Asterisk),
             '/' => Some(TokenPayload::Slash),
+            '=' => {
+                self.expect(|c| c == '=')?;
+                Some(TokenPayload::EqEq)
+            }
+            '!' => {
+                self.expect(|c| c == '=')?;
+                Some(TokenPayload::Neq)
+            }
+            '<' => {
+                if let Ok('=') = self.expect(|c| c == '=') {
+                    Some(TokenPayload::Le)
+                } else {
+                    Some(TokenPayload::Lt)
+                }
+            }
+            '>' => {
+                if let Ok('=') = self.expect(|c| c == '=') {
+                    Some(TokenPayload::Ge)
+                } else {
+                    Some(TokenPayload::Gt)
+                }
+            }
             ' ' | '\t' | '\r' | '\n' => None,
             _ => return Err(LexerError::InvalidCharacter { loc: begin_loc, c }),
         };

@@ -64,6 +64,12 @@ pub enum ExprPayload {
     Mul(ExprMul),
     Div(ExprDiv),
     Neg(ExprNeg),
+    Eq(ExprEq),
+    Ne(ExprNe),
+    Lt(ExprLt),
+    Le(ExprLe),
+    Gt(ExprGt),
+    Ge(ExprGe),
 }
 
 #[derive(Debug, Clone)]
@@ -98,4 +104,40 @@ pub struct ExprDiv {
 #[derive(Debug, Clone)]
 pub struct ExprNeg {
     pub expr: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprEq {
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprNe {
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprLt {
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprLe {
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprGt {
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprGe {
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
 }

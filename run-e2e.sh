@@ -78,6 +78,22 @@ check() {
   printf "\e[32mPASS\e[0m %s $NAME\n"
 }
 
+expr_test_count=1
+
+expr_test() {
+  EXPR="$1"
+  RESULT="$2"
+  DIR="fixtures/_expr_test_$expr_test_count"
+  expr_test_count=$((expr_test_count + 1))
+
+  rm -rf "$DIR"
+  mkdir -p "$DIR"
+  echo "main() { return $EXPR; }" > "$DIR/main.c"
+  echo "$RESULT" > "$DIR/status"
+}
+
+source fixtures/expr_tests.sh
+
 make target/debug/tocc
 
 for dir in fixtures/*/

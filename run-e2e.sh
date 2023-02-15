@@ -4,10 +4,17 @@ set -eu
 BASEDIR=$(dirname $(readlink -f "$0"))
 cd $BASEDIR
 
+exit_code=0
+
 wait_jobs() {
   for job in `jobs -p`
   do
+    set +e
     wait $job
+    if [ "$?" != "0" ]; then
+      exit_code=1
+    fi
+    set -e
   done
 }
 
@@ -107,3 +114,4 @@ do
 done
 
 wait_jobs
+exit $exit_code

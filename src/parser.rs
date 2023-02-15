@@ -312,14 +312,14 @@ impl Parser {
                         Ok((Op::Lt, rhs))
                     },
                     |p| {
-                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Gt), ">")?;
-                        let rhs = p.addsub()?;
-                        Ok((Op::Gt, rhs))
-                    },
-                    |p| {
                         p.satisfy_(|token| matches!(token.payload, TokenPayload::Le), "<=")?;
                         let rhs = p.addsub()?;
                         Ok((Op::Le, rhs))
+                    },
+                    |p| {
+                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Gt), ">")?;
+                        let rhs = p.addsub()?;
+                        Ok((Op::Gt, rhs))
                     },
                     |p| {
                         p.satisfy_(|token| matches!(token.payload, TokenPayload::Ge), ">=")?;
@@ -337,16 +337,16 @@ impl Parser {
                         rhs: Box::new(rhs),
                     }),
                 },
-                Op::Gt => Expr {
+                Op::Le => Expr {
                     loc: expr.loc.clone(),
-                    payload: ExprPayload::Gt(ExprGt {
+                    payload: ExprPayload::Le(ExprLe {
                         lhs: Box::new(expr),
                         rhs: Box::new(rhs),
                     }),
                 },
-                Op::Le => Expr {
+                Op::Gt => Expr {
                     loc: expr.loc.clone(),
-                    payload: ExprPayload::Le(ExprLe {
+                    payload: ExprPayload::Gt(ExprGt {
                         lhs: Box::new(expr),
                         rhs: Box::new(rhs),
                     }),

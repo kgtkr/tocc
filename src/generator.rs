@@ -131,10 +131,10 @@ impl Generator {
 
     fn instr_eq(&mut self, x: tac::InstrEq) {
         self.output
-            .append(format!("mov eax, {}\n", Self::local(x.rhs)));
+            .append(format!("mov edi, {}\n", Self::local(x.rhs)));
         self.output
-            .append(format!("mov edi, {}\n", Self::local(x.lhs)));
-        self.output.append("cmp rax, rdi\n");
+            .append(format!("mov eax, {}\n", Self::local(x.lhs)));
+        self.output.append("cmp eax, edi\n");
         self.output.append("sete al\n");
         self.output.append("movzx eax, al\n");
         self.output
@@ -143,10 +143,10 @@ impl Generator {
 
     fn instr_ne(&mut self, x: tac::InstrNe) {
         self.output
-            .append(format!("mov eax, {}\n", Self::local(x.rhs)));
+            .append(format!("mov edi, {}\n", Self::local(x.rhs)));
         self.output
-            .append(format!("mov edi, {}\n", Self::local(x.lhs)));
-        self.output.append("cmp rax, rdi\n");
+            .append(format!("mov eax, {}\n", Self::local(x.lhs)));
+        self.output.append("cmp eax, edi\n");
         self.output.append("setne al\n");
         self.output.append("movzx eax, al\n");
         self.output
@@ -155,10 +155,10 @@ impl Generator {
 
     fn instr_lt(&mut self, x: tac::InstrLt) {
         self.output
-            .append(format!("mov eax, {}\n", Self::local(x.rhs)));
+            .append(format!("mov edi, {}\n", Self::local(x.rhs)));
         self.output
-            .append(format!("mov edi, {}\n", Self::local(x.lhs)));
-        self.output.append("cmp rax, rdi\n");
+            .append(format!("mov eax, {}\n", Self::local(x.lhs)));
+        self.output.append("cmp eax, edi\n");
         self.output.append("setl al\n");
         self.output.append("movzx eax, al\n");
         self.output
@@ -167,10 +167,10 @@ impl Generator {
 
     fn instr_le(&mut self, x: tac::InstrLe) {
         self.output
-            .append(format!("mov eax, {}\n", Self::local(x.rhs)));
+            .append(format!("mov edi, {}\n", Self::local(x.rhs)));
         self.output
-            .append(format!("mov edi, {}\n", Self::local(x.lhs)));
-        self.output.append("cmp rax, rdi\n");
+            .append(format!("mov eax, {}\n", Self::local(x.lhs)));
+        self.output.append("cmp eax, edi\n");
         self.output.append("setle al\n");
         self.output.append("movzx eax, al\n");
         self.output

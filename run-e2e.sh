@@ -4,7 +4,7 @@ set -eu
 BASEDIR=$(dirname $(readlink -f "$0"))
 cd $BASEDIR
 
-exit_code=0
+fail_count=0
 
 wait_jobs() {
   for job in `jobs -p`
@@ -12,7 +12,7 @@ wait_jobs() {
     set +e
     wait $job
     if [ "$?" != "0" ]; then
-      exit_code=1
+      fail_count=$((fail_count + 1))
     fi
     set -e
   done
@@ -114,4 +114,7 @@ do
 done
 
 wait_jobs
-exit $exit_code
+if [ $fail_count -gt 0 ]; then
+  echo "$fail_count tests failed"
+  exit 1
+fi

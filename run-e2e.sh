@@ -86,12 +86,11 @@ expr_test() {
   DIR="fixtures/_expr_test_$expr_test_count"
   expr_test_count=$((expr_test_count + 1))
 
-  rm -rf "$DIR"
   mkdir -p "$DIR"
   echo "main() { return $EXPR; }" > "$DIR/main.c"
   echo "$RESULT" > "$DIR/status"
 }
-
+rm -rf fixtures/_expr_test_*
 source fixtures/expr_tests.sh
 
 make target/debug/tocc

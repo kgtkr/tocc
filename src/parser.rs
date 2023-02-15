@@ -365,18 +365,14 @@ impl Parser {
                 expected: "identifier".to_string(),
             }),
         })?;
-        self.satisfy(|token| match token.payload {
-            TokenPayload::ParenOpen => Ok(()),
-            _ => Err(ParseErrorPayload::UnexpectedToken {
-                expected: "(".to_string(),
-            }),
-        })?;
-        self.satisfy(|token| match token.payload {
-            TokenPayload::ParenClose => Ok(()),
-            _ => Err(ParseErrorPayload::UnexpectedToken {
-                expected: ")".to_string(),
-            }),
-        })?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::ParenOpen),
+            "(",
+        )?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::ParenClose),
+            ")",
+        )?;
         let stmts = self.compound_stmt()?;
         Ok(DeclFunc {
             name: name.clone(),

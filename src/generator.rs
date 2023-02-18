@@ -47,7 +47,7 @@ impl Generator {
     }
 
     fn local(local: usize) -> String {
-        format!("DWORD PTR [rbp-{}]", local * 4 + 8)
+        format!("DWORD PTR [rbp-{}]", local + 8)
     }
 
     fn instr(&mut self, instr: Instr) {

@@ -6,21 +6,21 @@ use crate::loc::Loc;
 use crate::tac;
 #[derive(Debug)]
 struct InstrGenerator {
-    locals_count: usize,
+    locals_size: usize,
     instrs: Vec<tac::Instr>,
 }
 
 impl InstrGenerator {
     fn new() -> InstrGenerator {
         InstrGenerator {
-            locals_count: 0,
+            locals_size: 0,
             instrs: Vec::new(),
         }
     }
 
     fn generate_local(&mut self) -> usize {
-        let local = self.locals_count;
-        self.locals_count += 1;
+        let local = self.locals_size;
+        self.locals_size += 4;
         local
     }
 
@@ -228,7 +228,7 @@ pub fn generate(program: Program) -> tac::Program {
                         loc: decl.loc,
                         payload: tac::DeclPayload::Func(tac::DeclFunc {
                             name: x.name,
-                            locals_count: gen.locals_count,
+                            locals_size: gen.locals_size,
                             instrs: gen.instrs,
                         }),
                     }

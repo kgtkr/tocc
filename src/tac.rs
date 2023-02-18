@@ -19,7 +19,7 @@ pub enum DeclPayload {
 #[derive(Debug, Clone)]
 pub struct DeclFunc {
     pub name: String,
-    pub locals_count: usize,
+    pub locals_size: usize,
     pub instrs: Vec<Instr>,
 }
 

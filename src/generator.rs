@@ -34,14 +34,13 @@ impl Generator {
         self.output.append(format!("{}:\n", x.name));
         self.output.append("push rbp\n");
         self.output.append("mov rbp, rsp\n");
-        let locals_len = x.locals_count * 4;
-        let locals_pad = if locals_len % 16 == 0 {
+        let locals_pad = if x.locals_size % 16 == 0 {
             0
         } else {
-            16 - locals_len % 16
+            16 - x.locals_size % 16
         };
         self.output
-            .append(format!("sub rsp, {}\n", locals_len + locals_pad));
+            .append(format!("sub rsp, {}\n", x.locals_size + locals_pad));
         for instr in x.instrs {
             self.instr(instr);
         }

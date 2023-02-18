@@ -6,21 +6,21 @@ use crate::loc::Loc;
 use crate::tac;
 #[derive(Debug)]
 struct InstrGenerator {
-    locals_size: usize,
+    locals: Vec<tac::Local>,
     instrs: Vec<tac::Instr>,
 }
 
 impl InstrGenerator {
     fn new() -> InstrGenerator {
         InstrGenerator {
-            locals_size: 0,
+            locals: Vec::new(),
             instrs: Vec::new(),
         }
     }
 
-    fn generate_local(&mut self) -> usize {
-        let local = self.locals_size;
-        self.locals_size += 4;
+    fn generate_local(&mut self, ty: tac::Type) -> usize {
+        let local = self.locals.len();
+        self.locals.push(tac::Local { ty });
         local
     }
 
@@ -74,7 +74,7 @@ impl InstrGenerator {
     }
 
     fn expr_int_lit(&mut self, loc: Loc, x: ExprIntLit) -> usize {
-        let dst = self.generate_local();
+        let dst = self.generate_local(tac::Type::Int);
         self.instrs.push(tac::Instr {
             loc,
             payload: tac::InstrPayload::IntConst(tac::InstrIntConst {
@@ -86,7 +86,7 @@ impl InstrGenerator {
     }
 
     fn expr_add(&mut self, loc: Loc, x: clang::ExprAdd) -> usize {
-        let dst = self.generate_local();
+        let dst = self.generate_local(tac::Type::Int);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
         self.instrs.push(tac::Instr {
@@ -97,7 +97,7 @@ impl InstrGenerator {
     }
 
     fn expr_sub(&mut self, loc: Loc, x: clang::ExprSub) -> usize {
-        let dst = self.generate_local();
+        let dst = self.generate_local(tac::Type::Int);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
         self.instrs.push(tac::Instr {
@@ -108,7 +108,7 @@ impl InstrGenerator {
     }
 
     fn expr_mul(&mut self, loc: Loc, x: clang::ExprMul) -> usize {
-        let dst = self.generate_local();
+        let dst = self.generate_local(tac::Type::Int);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
         self.instrs.push(tac::Instr {
@@ -119,7 +119,7 @@ impl InstrGenerator {
     }
 
     fn expr_div(&mut self, loc: Loc, x: clang::ExprDiv) -> usize {
-        let dst = self.generate_local();
+        let dst = self.generate_local(tac::Type::Int);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
         self.instrs.push(tac::Instr {
@@ -130,7 +130,7 @@ impl InstrGenerator {
     }
 
     fn expr_neg(&mut self, loc: Loc, x: clang::ExprNeg) -> usize {
-        let dst = self.generate_local();
+        let dst = self.generate_local(tac::Type::Int);
         let src = self.expr(*x.expr);
         self.instrs.push(tac::Instr {
             loc,
@@ -140,7 +140,7 @@ impl InstrGenerator {
     }
 
     fn expr_eq(&mut self, loc: Loc, x: clang::ExprEq) -> usize {
-        let dst = self.generate_local();
+        let dst = self.generate_local(tac::Type::Int);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
         self.instrs.push(tac::Instr {
@@ -151,7 +151,7 @@ impl InstrGenerator {
     }
 
     fn expr_ne(&mut self, loc: Loc, x: clang::ExprNe) -> usize {
-        let dst = self.generate_local();
+        let dst = self.generate_local(tac::Type::Int);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
         self.instrs.push(tac::Instr {
@@ -162,7 +162,7 @@ impl InstrGenerator {
     }
 
     fn expr_lt(&mut self, loc: Loc, x: clang::ExprLt) -> usize {
-        let dst = self.generate_local();
+        let dst = self.generate_local(tac::Type::Int);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
         self.instrs.push(tac::Instr {
@@ -173,7 +173,7 @@ impl InstrGenerator {
     }
 
     fn expr_le(&mut self, loc: Loc, x: clang::ExprLe) -> usize {
-        let dst = self.generate_local();
+        let dst = self.generate_local(tac::Type::Int);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
         self.instrs.push(tac::Instr {
@@ -184,7 +184,7 @@ impl InstrGenerator {
     }
 
     fn expr_gt(&mut self, loc: Loc, x: clang::ExprGt) -> usize {
-        let dst = self.generate_local();
+        let dst = self.generate_local(tac::Type::Int);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
         self.instrs.push(tac::Instr {
@@ -199,7 +199,7 @@ impl InstrGenerator {
     }
 
     fn expr_ge(&mut self, loc: Loc, x: clang::ExprGe) -> usize {
-        let dst = self.generate_local();
+        let dst = self.generate_local(tac::Type::Int);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
         self.instrs.push(tac::Instr {
@@ -228,7 +228,7 @@ pub fn generate(program: Program) -> tac::Program {
                         loc: decl.loc,
                         payload: tac::DeclPayload::Func(tac::DeclFunc {
                             name: x.name,
-                            locals_size: gen.locals_size,
+                            locals: gen.locals,
                             instrs: gen.instrs,
                         }),
                     }

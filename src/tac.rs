@@ -1,6 +1,24 @@
 use crate::loc::Loc;
 
 #[derive(Debug, Clone)]
+pub enum Type {
+    Int,
+}
+
+impl Type {
+    pub fn size(&self) -> usize {
+        match self {
+            Type::Int => 4,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Local {
+    pub ty: Type,
+}
+
+#[derive(Debug, Clone)]
 pub struct Program {
     pub decls: Vec<Decl>,
 }
@@ -19,7 +37,7 @@ pub enum DeclPayload {
 #[derive(Debug, Clone)]
 pub struct DeclFunc {
     pub name: String,
-    pub locals_size: usize,
+    pub locals: Vec<Local>,
     pub instrs: Vec<Instr>,
 }
 

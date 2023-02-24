@@ -5,9 +5,10 @@ BASEDIR=$(dirname $(readlink -f "$0"))
 cd $BASEDIR
 
 fail_count=0
+jobs=()
 
 wait_jobs() {
-  for job in `jobs -p`
+  for job in ${jobs[@]};
   do
     set +e
     wait $job
@@ -16,6 +17,7 @@ wait_jobs() {
     fi
     set -e
   done
+  jobs=()
 }
 
 check() {
@@ -104,13 +106,14 @@ make target/debug/tocc
 
 for dir in fixtures/*/
 do
-  jobs_count=`jobs -p | wc -l`
+  jobs_count=${#jobs[@]}
   if [ $jobs_count -gt 5 ]; then
     wait_jobs
   fi
 
   NAME=$(basename $dir)
   check "$NAME" &
+  jobs+=($!)
 done
 
 wait_jobs

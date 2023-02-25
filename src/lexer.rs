@@ -95,6 +95,7 @@ impl Lexer {
                 }
                 Some(match ident.as_str() {
                     "return" => TokenPayload::Return,
+                    "int" => TokenPayload::Int,
                     _ => TokenPayload::Ident(ident),
                 })
             }

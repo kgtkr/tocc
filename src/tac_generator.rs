@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use crate::clang::{
     self, DeclPayload, Expr, ExprIntLit, ExprPayload, Program, Stmt, StmtCompound, StmtExpr,
-    StmtPayload, StmtReturn,
+    StmtPayload, StmtReturn, StmtVarDecl,
 };
 use crate::loc::Loc;
 use crate::tac;
@@ -8,6 +10,7 @@ use crate::tac;
 struct InstrGenerator {
     locals: Vec<tac::Local>,
     instrs: Vec<tac::Instr>,
+    local_idents: HashMap<String, usize>,
 }
 
 impl InstrGenerator {
@@ -15,6 +18,7 @@ impl InstrGenerator {
         InstrGenerator {
             locals: Vec::new(),
             instrs: Vec::new(),
+            local_idents: HashMap::new(),
         }
     }
 
@@ -34,6 +38,7 @@ impl InstrGenerator {
                 self.stmt_return(stmt.loc, x);
             }
             Compound(x) => self.stmt_compound(x),
+            VarDecl(x) => self.stmt_var_decl(x),
         }
     }
 
@@ -55,6 +60,11 @@ impl InstrGenerator {
         }
     }
 
+    fn stmt_var_decl(&mut self, x: StmtVarDecl) {
+        let local = self.generate_local(tac::Type::Int);
+        self.local_idents.insert(x.name, local);
+    }
+
     fn expr(&mut self, expr: Expr) -> usize {
         use ExprPayload::*;
         match expr.payload {
@@ -70,6 +80,7 @@ impl InstrGenerator {
             Le(x) => self.expr_le(expr.loc, x),
             Gt(x) => self.expr_gt(expr.loc, x),
             Ge(x) => self.expr_ge(expr.loc, x),
+            Var(x) => self.expr_var(expr.loc, x),
         }
     }
 
@@ -211,6 +222,10 @@ impl InstrGenerator {
             }),
         });
         dst
+    }
+
+    fn expr_var(&mut self, _loc: Loc, x: clang::ExprVar) -> usize {
+        *self.local_idents.get(&x.name).expect("undeclared variable")
     }
 }
 

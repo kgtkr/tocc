@@ -1,7 +1,7 @@
 use crate::clang::{
     Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprDiv, ExprEq, ExprGe, ExprGt, ExprIntLit,
-    ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload, ExprSub, Program, Stmt, StmtCompound,
-    StmtExpr, StmtPayload, StmtReturn,
+    ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload, ExprSub, ExprVar, Program, Stmt,
+    StmtCompound, StmtExpr, StmtPayload, StmtReturn, StmtVarDecl, Type,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -184,6 +184,19 @@ impl Parser {
                     ")",
                 )?;
                 Ok(expr)
+            },
+            |p| {
+                let token = p.peek().clone();
+                let ident = p.satisfy(|token| match &token.payload {
+                    TokenPayload::Ident(ident) => Ok(ident.clone()),
+                    _ => Err(ParseErrorPayload::UnexpectedToken {
+                        expected: "identifier".to_string(),
+                    }),
+                })?;
+                Ok(Expr {
+                    loc: token.loc,
+                    payload: ExprPayload::Var(ExprVar { name: ident }),
+                })
             },
         )
     }
@@ -416,6 +429,7 @@ impl Parser {
             |p| p.return_stmt().map(StmtPayload::Return),
             |p| p.compound_stmt().map(StmtPayload::Compound),
             |p| p.expr_stmt().map(StmtPayload::Expr),
+            |p| p.var_decl_stmt().map(StmtPayload::VarDecl),
         )?;
 
         Ok(Stmt {
@@ -460,6 +474,21 @@ impl Parser {
         Ok(StmtCompound { stmts })
     }
 
+    fn var_decl_stmt(&mut self) -> Result<StmtVarDecl, ParseError> {
+        let typ = self.typ()?;
+        let name = self.satisfy(|token| match &token.payload {
+            TokenPayload::Ident(name) => Ok(name.clone()),
+            _ => Err(ParseErrorPayload::UnexpectedToken {
+                expected: "identifier".to_string(),
+            }),
+        })?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::Semicolon),
+            ";",
+        )?;
+        Ok(StmtVarDecl { typ, name })
+    }
+
     fn decl(&mut self) -> Result<Decl, ParseError> {
         let token = self.peek().clone();
         let payload = DeclPayload::Func(self.func_decl()?);
@@ -489,6 +518,11 @@ impl Parser {
             name: name.clone(),
             body: stmts,
         })
+    }
+
+    fn typ(&mut self) -> Result<Type, ParseError> {
+        self.satisfy_(|token| matches!(token.payload, TokenPayload::Int), "int")?;
+        Ok(Type::Int)
     }
 
     pub fn parse(&mut self) -> Result<Program, ParseError> {

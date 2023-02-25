@@ -1,6 +1,11 @@
 use crate::loc::Loc;
 
 #[derive(Debug, Clone)]
+pub enum Type {
+    Int,
+}
+
+#[derive(Debug, Clone)]
 pub struct Program {
     pub decls: Vec<Decl>,
 }
@@ -33,6 +38,7 @@ pub enum StmtPayload {
     Expr(StmtExpr),
     Return(StmtReturn),
     Compound(StmtCompound),
+    VarDecl(StmtVarDecl),
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +54,12 @@ pub struct StmtReturn {
 #[derive(Debug, Clone)]
 pub struct StmtCompound {
     pub stmts: Vec<Stmt>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StmtVarDecl {
+    pub typ: Type,
+    pub name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -70,6 +82,7 @@ pub enum ExprPayload {
     Le(ExprLe),
     Gt(ExprGt),
     Ge(ExprGe),
+    Var(ExprVar),
 }
 
 #[derive(Debug, Clone)]
@@ -140,4 +153,9 @@ pub struct ExprGt {
 pub struct ExprGe {
     pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprVar {
+    pub name: String,
 }

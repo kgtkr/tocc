@@ -82,7 +82,12 @@ pub enum ExprPayload {
     Le(ExprLe),
     Gt(ExprGt),
     Ge(ExprGe),
-    Var(ExprVar),
+    LValue(ExprLValue),
+}
+
+#[derive(Debug, Clone)]
+pub enum ExprLValue {
+    Var(LValueVar),
 }
 
 #[derive(Debug, Clone)]
@@ -156,6 +161,6 @@ pub struct ExprGe {
 }
 
 #[derive(Debug, Clone)]
-pub struct ExprVar {
+pub struct LValueVar {
     pub name: String,
 }

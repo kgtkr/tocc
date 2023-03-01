@@ -80,7 +80,7 @@ impl InstrGenerator {
             Le(x) => self.expr_le(expr.loc, x),
             Gt(x) => self.expr_gt(expr.loc, x),
             Ge(x) => self.expr_ge(expr.loc, x),
-            Var(x) => self.expr_var(expr.loc, x),
+            LValue(x) => self.expr_lvalue(expr.loc, x),
         }
     }
 
@@ -224,8 +224,31 @@ impl InstrGenerator {
         dst
     }
 
-    fn expr_var(&mut self, _loc: Loc, x: clang::ExprVar) -> usize {
-        *self.local_idents.get(&x.name).expect("undeclared variable")
+    fn expr_lvalue(&mut self, loc: Loc, x: clang::ExprLValue) -> usize {
+        let dst = self.generate_local(tac::Type::Int);
+        let src = self.lvalue(loc.clone(), x);
+        self.instrs.push(tac::Instr {
+            loc,
+            payload: tac::InstrPayload::Deref(tac::InstrDeref { dst, src }),
+        });
+        dst
+    }
+
+    fn lvalue(&mut self, loc: Loc, x: clang::ExprLValue) -> usize {
+        use clang::ExprLValue::*;
+        match x {
+            Var(x) => self.lvalue_var(loc, x),
+        }
+    }
+
+    fn lvalue_var(&mut self, loc: Loc, x: clang::LValueVar) -> usize {
+        let dst = self.generate_local(tac::Type::Int64);
+        let src = *self.local_idents.get(&x.name).expect("undeclared variable");
+        self.instrs.push(tac::Instr {
+            loc,
+            payload: tac::InstrPayload::LocalAddr(tac::InstrLocalAddr { dst, src }),
+        });
+        dst
     }
 }
 

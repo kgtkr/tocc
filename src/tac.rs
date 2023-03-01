@@ -3,12 +3,14 @@ use crate::loc::Loc;
 #[derive(Debug, Clone)]
 pub enum Type {
     Int,
+    Int64,
 }
 
 impl Type {
     pub fn size(&self) -> usize {
         match self {
             Type::Int => 4,
+            Type::Int64 => 8,
         }
     }
 }
@@ -60,6 +62,8 @@ pub enum InstrPayload {
     Ne(InstrNe),
     Lt(InstrLt),
     Le(InstrLe),
+    LocalAddr(InstrLocalAddr),
+    Deref(InstrDeref),
 }
 
 #[derive(Debug, Clone)]
@@ -133,4 +137,16 @@ pub struct InstrLe {
     pub dst: usize,
     pub lhs: usize,
     pub rhs: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrLocalAddr {
+    pub dst: usize,
+    pub src: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrDeref {
+    pub dst: usize,
+    pub src: usize,
 }

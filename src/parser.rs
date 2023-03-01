@@ -1,7 +1,7 @@
 use crate::clang::{
     Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprDiv, ExprEq, ExprGe, ExprGt, ExprIntLit,
-    ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload, ExprSub, ExprVar, Program, Stmt,
-    StmtCompound, StmtExpr, StmtPayload, StmtReturn, StmtVarDecl, Type,
+    ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload, ExprSub, LValueVar, Program,
+    Stmt, StmtCompound, StmtExpr, StmtPayload, StmtReturn, StmtVarDecl, Type,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -195,7 +195,7 @@ impl Parser {
                 })?;
                 Ok(Expr {
                     loc: token.loc,
-                    payload: ExprPayload::Var(ExprVar { name: ident }),
+                    payload: ExprPayload::LValue(ExprLValue::Var(LValueVar { name: ident })),
                 })
             },
         )

@@ -39,6 +39,7 @@ impl Generator {
 pub struct FuncGenerator {
     buf: Buf,
     local_offsets: Vec<usize>,
+    locals: Vec<tac::Local>,
 }
 
 impl FuncGenerator {
@@ -56,6 +57,7 @@ impl FuncGenerator {
         let mut gen = FuncGenerator {
             buf: Buf::new(),
             local_offsets,
+            locals: func.locals.clone(),
         };
         gen.decl_func(func);
         gen.buf
@@ -85,7 +87,14 @@ impl FuncGenerator {
     }
 
     fn local(&self, local: usize) -> String {
-        format!("DWORD PTR [rbp-{}]", self.local_offsets[local])
+        format!(
+            "{} PTR [rbp-{}]",
+            match self.locals[local].ty {
+                tac::Type::Int => "DWORD",
+                tac::Type::Int64 => "QWORD",
+            },
+            self.local_offsets[local]
+        )
     }
 
     fn instr(&mut self, instr: Instr) {
@@ -102,6 +111,8 @@ impl FuncGenerator {
             Ne(x) => self.instr_ne(x),
             Lt(x) => self.instr_lt(x),
             Le(x) => self.instr_le(x),
+            LocalAddr(x) => self.instr_local_addr(x),
+            Deref(x) => self.instr_deref(x),
         }
     }
 
@@ -184,6 +195,17 @@ impl FuncGenerator {
         self.buf.append("cmp eax, edi\n");
         self.buf.append("setle al\n");
         self.buf.append("movzx eax, al\n");
+        self.buf.append(format!("mov {}, eax\n", self.local(x.dst)));
+    }
+
+    fn instr_local_addr(&mut self, x: tac::InstrLocalAddr) {
+        self.buf.append(format!("lea rax, {}\n", self.local(x.src)));
+        self.buf.append(format!("mov {}, rax\n", self.local(x.dst)));
+    }
+
+    fn instr_deref(&mut self, x: tac::InstrDeref) {
+        self.buf.append(format!("mov rax, {}\n", self.local(x.src)));
+        self.buf.append("mov eax, [rax]\n");
         self.buf.append(format!("mov {}, eax\n", self.local(x.dst)));
     }
 }

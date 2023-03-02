@@ -1,4 +1,4 @@
-use crate::{loc::Loc, Bit};
+use crate::Bit;
 
 #[derive(Debug, Clone)]
 pub struct Local {
@@ -12,7 +12,6 @@ pub struct Program {
 
 #[derive(Debug, Clone)]
 pub struct Decl {
-    pub loc: Loc,
     pub payload: DeclPayload,
 }
 
@@ -30,7 +29,6 @@ pub struct DeclFunc {
 
 #[derive(Debug, Clone)]
 pub struct Instr {
-    pub loc: Loc,
     pub payload: InstrPayload,
 }
 

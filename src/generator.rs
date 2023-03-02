@@ -113,6 +113,7 @@ impl FuncGenerator {
             Le(x) => self.instr_le(x),
             LocalAddr(x) => self.instr_local_addr(x),
             Deref(x) => self.instr_deref(x),
+            AssignIndirect(x) => self.instr_assign_indirect(x),
         }
     }
 
@@ -207,6 +208,12 @@ impl FuncGenerator {
         self.buf.append(format!("mov rax, {}\n", self.local(x.src)));
         self.buf.append("mov eax, [rax]\n");
         self.buf.append(format!("mov {}, eax\n", self.local(x.dst)));
+    }
+
+    fn instr_assign_indirect(&mut self, x: tac::InstrAssignIndirect) {
+        self.buf.append(format!("mov rax, {}\n", self.local(x.dst)));
+        self.buf.append(format!("mov edi, {}\n", self.local(x.src)));
+        self.buf.append("mov DWORD PTR [rax], edi\n");
     }
 }
 

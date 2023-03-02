@@ -1,7 +1,7 @@
 use crate::clang::{
-    Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprDiv, ExprEq, ExprGe, ExprGt, ExprIntLit,
-    ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload, ExprSub, LValueVar, Program,
-    Stmt, StmtCompound, StmtExpr, StmtPayload, StmtReturn, StmtVarDecl, Type,
+    Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprAssign, ExprDiv, ExprEq, ExprGe, ExprGt,
+    ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload, ExprSub,
+    LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtPayload, StmtReturn, StmtVarDecl, Type,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -417,8 +417,24 @@ impl Parser {
         )
     }
 
-    fn expr(&mut self) -> Result<Expr, ParseError> {
+    fn assign(&mut self) -> Result<Expr, ParseError> {
         let expr = self.equality()?;
+        if let Ok(_) = self.satisfy_(|token| matches!(token.payload, TokenPayload::Eq), "=") {
+            let rhs = self.assign()?;
+            Ok(Expr {
+                loc: expr.loc.clone(),
+                payload: ExprPayload::Assign(ExprAssign {
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                }),
+            })
+        } else {
+            Ok(expr)
+        }
+    }
+
+    fn expr(&mut self) -> Result<Expr, ParseError> {
+        let expr = self.assign()?;
         Ok(expr)
     }
 

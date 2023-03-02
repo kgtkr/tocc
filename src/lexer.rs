@@ -109,8 +109,11 @@ impl Lexer {
             '*' => Some(TokenPayload::Asterisk),
             '/' => Some(TokenPayload::Slash),
             '=' => {
-                self.expect(|c| c == '=')?;
-                Some(TokenPayload::EqEq)
+                if let Ok('=') = self.expect(|c| c == '=') {
+                    Some(TokenPayload::EqEq)
+                } else {
+                    Some(TokenPayload::Eq)
+                }
             }
             '!' => {
                 self.expect(|c| c == '=')?;

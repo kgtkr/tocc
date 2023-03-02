@@ -32,4 +32,5 @@ pub enum TokenPayload {
     Gt,
     Ge,
     Int,
+    Eq,
 }

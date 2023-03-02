@@ -81,6 +81,7 @@ impl InstrGenerator {
             Gt(x) => self.expr_gt(expr.loc, x),
             Ge(x) => self.expr_ge(expr.loc, x),
             LValue(x) => self.expr_lvalue(expr.loc, x),
+            Assign(x) => self.expr_assign(expr.loc, x),
         }
     }
 
@@ -222,6 +223,19 @@ impl InstrGenerator {
             }),
         });
         dst
+    }
+
+    fn expr_assign(&mut self, loc: Loc, x: clang::ExprAssign) -> usize {
+        let clang::ExprPayload::LValue(lvalue) = x.lhs.payload else {
+            panic!("expected lvalue");
+        };
+        let dst = self.lvalue(loc.clone(), lvalue);
+        let src = self.expr(*x.rhs);
+        self.instrs.push(tac::Instr {
+            loc,
+            payload: tac::InstrPayload::AssignIndirect(tac::InstrAssignIndirect { dst, src }),
+        });
+        src
     }
 
     fn expr_lvalue(&mut self, loc: Loc, x: clang::ExprLValue) -> usize {

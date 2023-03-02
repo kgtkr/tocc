@@ -83,6 +83,7 @@ pub enum ExprPayload {
     Gt(ExprGt),
     Ge(ExprGe),
     LValue(ExprLValue),
+    Assign(ExprAssign),
 }
 
 #[derive(Debug, Clone)]
@@ -163,4 +164,10 @@ pub struct ExprGe {
 #[derive(Debug, Clone)]
 pub struct LValueVar {
     pub name: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprAssign {
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
 }

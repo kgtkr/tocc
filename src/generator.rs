@@ -175,7 +175,7 @@ impl FuncGenerator {
             .iter()
             .scan(8 /* rbpの分 */, |acc, local| {
                 let offset = *acc;
-                *acc += local.ty.size();
+                *acc += local.bit.to_size();
                 Some(offset)
             })
             .collect::<Vec<_>>();
@@ -193,7 +193,7 @@ impl FuncGenerator {
         let locals_size = func
             .locals
             .iter()
-            .map(|local| local.ty.size())
+            .map(|local| local.bit.to_size())
             .sum::<usize>();
 
         self.buf.append(format!("{}:\n", func.name));
@@ -215,9 +215,11 @@ impl FuncGenerator {
     fn local(&self, local: usize) -> String {
         format!(
             "{} PTR [rbp-{}]",
-            match self.locals[local].ty {
-                tac::Type::Int => "DWORD",
-                tac::Type::Int64 => "QWORD",
+            match self.locals[local].bit {
+                Bit::Bit8 => "BYTE",
+                Bit::Bit16 => "WORD",
+                Bit::Bit32 => "DWORD",
+                Bit::Bit64 => "QWORD",
             },
             self.local_offsets[local]
         )

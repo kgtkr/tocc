@@ -1,23 +1,8 @@
-use crate::loc::Loc;
-
-#[derive(Debug, Clone)]
-pub enum Type {
-    Int,
-    Int64,
-}
-
-impl Type {
-    pub fn size(&self) -> usize {
-        match self {
-            Type::Int => 4,
-            Type::Int64 => 8,
-        }
-    }
-}
+use crate::{loc::Loc, Bit};
 
 #[derive(Debug, Clone)]
 pub struct Local {
-    pub ty: Type,
+    pub bit: Bit,
 }
 
 #[derive(Debug, Clone)]

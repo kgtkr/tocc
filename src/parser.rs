@@ -1,7 +1,8 @@
 use crate::clang::{
     Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprAssign, ExprDiv, ExprEq, ExprGe, ExprGt,
     ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload, ExprSub,
-    LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtPayload, StmtReturn, StmtVarDecl, Type,
+    LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf, StmtPayload, StmtReturn,
+    StmtVarDecl, StmtWhile, Type,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -446,6 +447,9 @@ impl Parser {
             |p| p.compound_stmt().map(StmtPayload::Compound),
             |p| p.expr_stmt().map(StmtPayload::Expr),
             |p| p.var_decl_stmt().map(StmtPayload::VarDecl),
+            |p| p.if_stmt().map(StmtPayload::If),
+            |p| p.while_stmt().map(StmtPayload::While),
+            |p| p.for_stmt().map(StmtPayload::For),
         )?;
 
         Ok(Stmt {
@@ -503,6 +507,80 @@ impl Parser {
             ";",
         )?;
         Ok(StmtVarDecl { typ, name })
+    }
+
+    fn if_stmt(&mut self) -> Result<StmtIf, ParseError> {
+        self.satisfy_(|token| matches!(token.payload, TokenPayload::If), "if")?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::ParenOpen),
+            "(",
+        )?;
+        let cond = self.expr()?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::ParenClose),
+            ")",
+        )?;
+        let then = self.stat()?;
+        let else_ = self.optional(|p| {
+            p.satisfy_(|token| matches!(token.payload, TokenPayload::Else), "else")?;
+            p.stat()
+        })?;
+        Ok(StmtIf {
+            cond,
+            then: Box::new(then),
+            else_: else_.map(Box::new),
+        })
+    }
+
+    fn while_stmt(&mut self) -> Result<StmtWhile, ParseError> {
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::While),
+            "while",
+        )?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::ParenOpen),
+            "(",
+        )?;
+        let cond = self.expr()?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::ParenClose),
+            ")",
+        )?;
+        let body = self.stat()?;
+        Ok(StmtWhile {
+            cond,
+            body: Box::new(body),
+        })
+    }
+
+    fn for_stmt(&mut self) -> Result<StmtFor, ParseError> {
+        self.satisfy_(|token| matches!(token.payload, TokenPayload::For), "for")?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::ParenOpen),
+            "(",
+        )?;
+        let init = self.optional(|p| p.expr())?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::Semicolon),
+            ";",
+        )?;
+        let cond = self.optional(|p| p.expr())?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::Semicolon),
+            ";",
+        )?;
+        let step = self.optional(|p| p.expr())?;
+        self.satisfy_(
+            |token| matches!(token.payload, TokenPayload::ParenClose),
+            ")",
+        )?;
+        let body = self.stat()?;
+        Ok(StmtFor {
+            init,
+            cond,
+            step,
+            body: Box::new(body),
+        })
     }
 
     fn decl(&mut self) -> Result<Decl, ParseError> {

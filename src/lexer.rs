@@ -96,6 +96,10 @@ impl Lexer {
                 Some(match ident.as_str() {
                     "return" => TokenPayload::Return,
                     "int" => TokenPayload::Int,
+                    "if" => TokenPayload::If,
+                    "else" => TokenPayload::Else,
+                    "while" => TokenPayload::While,
+                    "for" => TokenPayload::For,
                     _ => TokenPayload::Ident(ident),
                 })
             }

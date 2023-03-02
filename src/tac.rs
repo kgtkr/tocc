@@ -65,6 +65,9 @@ pub enum InstrPayload {
     LocalAddr(InstrLocalAddr),
     Deref(InstrDeref),
     AssignIndirect(InstrAssignIndirect),
+    Label(InstrLabel),
+    Jump(InstrJump),
+    JumpIf(InstrJumpIf),
 }
 
 #[derive(Debug, Clone)]
@@ -156,4 +159,20 @@ pub struct InstrDeref {
 pub struct InstrAssignIndirect {
     pub dst: usize,
     pub src: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrLabel {
+    pub label: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrJump {
+    pub label: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrJumpIf {
+    pub label: usize,
+    pub cond: usize,
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::clang::{
     self, DeclPayload, Expr, ExprIntLit, ExprPayload, Program, Stmt, StmtCompound, StmtExpr,
-    StmtPayload, StmtReturn, StmtVarDecl,
+    StmtIf, StmtPayload, StmtReturn, StmtVarDecl,
 };
 use crate::loc::Loc;
 use crate::tac;
@@ -11,6 +11,7 @@ struct InstrGenerator {
     locals: Vec<tac::Local>,
     instrs: Vec<tac::Instr>,
     local_idents: HashMap<String, usize>,
+    label_count: usize,
 }
 
 impl InstrGenerator {
@@ -19,6 +20,7 @@ impl InstrGenerator {
             locals: Vec::new(),
             instrs: Vec::new(),
             local_idents: HashMap::new(),
+            label_count: 0,
         }
     }
 
@@ -26,6 +28,12 @@ impl InstrGenerator {
         let local = self.locals.len();
         self.locals.push(tac::Local { ty });
         local
+    }
+
+    fn generate_label(&mut self) -> usize {
+        let label = self.label_count;
+        self.label_count += 1;
+        label
     }
 
     fn stmt(&mut self, stmt: Stmt) {
@@ -39,6 +47,9 @@ impl InstrGenerator {
             }
             Compound(x) => self.stmt_compound(x),
             VarDecl(x) => self.stmt_var_decl(x),
+            If(x) => self.stmt_if(x),
+            While(x) => self.stmt_while(x),
+            For(x) => self.stmt_for(x),
         }
     }
 
@@ -63,6 +74,124 @@ impl InstrGenerator {
     fn stmt_var_decl(&mut self, x: StmtVarDecl) {
         let local = self.generate_local(tac::Type::Int);
         self.local_idents.insert(x.name, local);
+    }
+
+    fn stmt_if(&mut self, x: StmtIf) {
+        let cond_neg = self.generate_local(tac::Type::Int);
+        let else_label = self.generate_label();
+        let end_label = self.generate_label();
+
+        let cond = self.expr(x.cond.clone());
+        self.instrs.push(tac::Instr {
+            loc: x.cond.loc.clone(),
+            payload: tac::InstrPayload::Neg(tac::InstrNeg {
+                src: cond,
+                dst: cond_neg,
+            }),
+        });
+
+        self.instrs.push(tac::Instr {
+            loc: x.cond.loc.clone(),
+            payload: tac::InstrPayload::JumpIf(tac::InstrJumpIf {
+                cond: cond_neg,
+                label: else_label,
+            }),
+        });
+
+        self.stmt(*x.then);
+        self.instrs.push(tac::Instr {
+            loc: x.cond.loc.clone(),
+            payload: tac::InstrPayload::Jump(tac::InstrJump { label: end_label }),
+        });
+        self.instrs.push(tac::Instr {
+            loc: x.cond.loc.clone(),
+            payload: tac::InstrPayload::Label(tac::InstrLabel { label: else_label }),
+        });
+        if let Some(else_) = x.else_ {
+            self.stmt(*else_);
+        }
+        self.instrs.push(tac::Instr {
+            loc: x.cond.loc.clone(),
+            payload: tac::InstrPayload::Label(tac::InstrLabel { label: end_label }),
+        });
+    }
+
+    fn stmt_while(&mut self, x: clang::StmtWhile) {
+        let cond_label = self.generate_label();
+        let end_label = self.generate_label();
+        let cond_neg = self.generate_local(tac::Type::Int);
+
+        self.instrs.push(tac::Instr {
+            loc: x.cond.loc.clone(),
+            payload: tac::InstrPayload::Label(tac::InstrLabel { label: cond_label }),
+        });
+        let cond = self.expr(x.cond.clone());
+        self.instrs.push(tac::Instr {
+            loc: x.cond.loc.clone(),
+            payload: tac::InstrPayload::Neg(tac::InstrNeg {
+                src: cond,
+                dst: cond_neg,
+            }),
+        });
+        self.instrs.push(tac::Instr {
+            loc: x.cond.loc.clone(),
+            payload: tac::InstrPayload::JumpIf(tac::InstrJumpIf {
+                cond: cond_neg,
+                label: end_label,
+            }),
+        });
+        self.stmt(*x.body);
+        self.instrs.push(tac::Instr {
+            loc: x.cond.loc.clone(),
+            payload: tac::InstrPayload::Jump(tac::InstrJump { label: cond_label }),
+        });
+        self.instrs.push(tac::Instr {
+            loc: x.cond.loc.clone(),
+            payload: tac::InstrPayload::Label(tac::InstrLabel { label: end_label }),
+        });
+    }
+
+    fn stmt_for(&mut self, x: clang::StmtFor) {
+        let cond_label = self.generate_label();
+        let end_label = self.generate_label();
+        let cond_neg = self.generate_local(tac::Type::Int);
+
+        if let Some(init) = x.init {
+            self.expr(init);
+        }
+        self.instrs.push(tac::Instr {
+            loc: x.body.loc.clone(),
+            payload: tac::InstrPayload::Label(tac::InstrLabel { label: cond_label }),
+        });
+        if let Some(cond) = x.cond {
+            let cond = self.expr(cond);
+            self.instrs.push(tac::Instr {
+                loc: x.body.loc.clone(),
+                payload: tac::InstrPayload::Neg(tac::InstrNeg {
+                    src: cond,
+                    dst: cond_neg,
+                }),
+            });
+            self.instrs.push(tac::Instr {
+                loc: x.body.loc.clone(),
+                payload: tac::InstrPayload::JumpIf(tac::InstrJumpIf {
+                    cond: cond_neg,
+                    label: end_label,
+                }),
+            });
+        }
+        self.stmt(*x.body.clone());
+        if let Some(step) = x.step {
+            self.expr(step);
+        }
+        self.instrs.push(tac::Instr {
+            loc: x.body.loc.clone(),
+            payload: tac::InstrPayload::Jump(tac::InstrJump { label: cond_label }),
+        });
+        self.instrs.push(tac::Instr {
+            loc: x.body.loc.clone(),
+            payload: tac::InstrPayload::Label(tac::InstrLabel { label: end_label }),
+        });
     }
 
     fn expr(&mut self, expr: Expr) -> usize {

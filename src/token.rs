@@ -33,4 +33,8 @@ pub enum TokenPayload {
     Ge,
     Int,
     Eq,
+    If,
+    Else,
+    While,
+    For,
 }

@@ -39,6 +39,9 @@ pub enum StmtPayload {
     Return(StmtReturn),
     Compound(StmtCompound),
     VarDecl(StmtVarDecl),
+    If(StmtIf),
+    While(StmtWhile),
+    For(StmtFor),
 }
 
 #[derive(Debug, Clone)]
@@ -60,6 +63,27 @@ pub struct StmtCompound {
 pub struct StmtVarDecl {
     pub typ: Type,
     pub name: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct StmtIf {
+    pub cond: Expr,
+    pub then: Box<Stmt>,
+    pub else_: Option<Box<Stmt>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StmtWhile {
+    pub cond: Expr,
+    pub body: Box<Stmt>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StmtFor {
+    pub init: Option<Expr>,
+    pub cond: Option<Expr>,
+    pub step: Option<Expr>,
+    pub body: Box<Stmt>,
 }
 
 #[derive(Debug, Clone)]

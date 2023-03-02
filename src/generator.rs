@@ -40,6 +40,7 @@ pub struct FuncGenerator {
     buf: Buf,
     local_offsets: Vec<usize>,
     locals: Vec<tac::Local>,
+    func_name: String,
 }
 
 impl FuncGenerator {
@@ -58,6 +59,7 @@ impl FuncGenerator {
             buf: Buf::new(),
             local_offsets,
             locals: func.locals.clone(),
+            func_name: func.name.clone(),
         };
         gen.decl_func(func);
         gen.buf
@@ -114,6 +116,9 @@ impl FuncGenerator {
             LocalAddr(x) => self.instr_local_addr(x),
             Deref(x) => self.instr_deref(x),
             AssignIndirect(x) => self.instr_assign_indirect(x),
+            Label(x) => self.instr_label(x),
+            Jump(x) => self.instr_jump(x),
+            JumpIf(x) => self.instr_jump_if(x),
         }
     }
 
@@ -214,6 +219,24 @@ impl FuncGenerator {
         self.buf.append(format!("mov rax, {}\n", self.local(x.dst)));
         self.buf.append(format!("mov edi, {}\n", self.local(x.src)));
         self.buf.append("mov DWORD PTR [rax], edi\n");
+    }
+
+    fn instr_label(&mut self, x: tac::InstrLabel) {
+        self.buf
+            .append(format!(".L.{}.{}:", self.func_name, x.label));
+    }
+
+    fn instr_jump(&mut self, x: tac::InstrJump) {
+        self.buf
+            .append(format!("jmp .L.{}.{}", self.func_name, x.label));
+    }
+
+    fn instr_jump_if(&mut self, x: tac::InstrJumpIf) {
+        self.buf
+            .append(format!("mov eax, {}\n", self.local(x.cond)));
+        self.buf.append(format!("cmp eax, 0\n"));
+        self.buf
+            .append(format!("jen .L.{}.{}", self.func_name, x.label));
     }
 }
 

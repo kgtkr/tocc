@@ -1,5 +1,131 @@
 use crate::buf::Buf;
 use crate::tac::{self, Decl, DeclFunc, DeclPayload, Instr, InstrPayload, InstrReturn, Program};
+use crate::Bit;
+
+#[derive(Debug, Copy, Clone)]
+enum Register {
+    Rax,
+    Rbx,
+    Rcx,
+    Rdx,
+    Rsi,
+    Rdi,
+    Rbp,
+    Rsp,
+    R8,
+    R9,
+    R10,
+    R11,
+    R12,
+    R13,
+    R14,
+    R15,
+}
+
+impl Register {
+    fn for_bit(self, bit: Bit) -> &'static str {
+        use Bit::*;
+        use Register::*;
+        match self {
+            Rax => match bit {
+                Bit8 => "al",
+                Bit16 => "ax",
+                Bit32 => "eax",
+                Bit64 => "rax",
+            },
+            Rbx => match bit {
+                Bit8 => "bl",
+                Bit16 => "bx",
+                Bit32 => "ebx",
+                Bit64 => "rbx",
+            },
+            Rcx => match bit {
+                Bit8 => "cl",
+                Bit16 => "cx",
+                Bit32 => "ecx",
+                Bit64 => "rcx",
+            },
+            Rdx => match bit {
+                Bit8 => "dl",
+                Bit16 => "dx",
+                Bit32 => "edx",
+                Bit64 => "rdx",
+            },
+            Rsi => match bit {
+                Bit8 => "sil",
+                Bit16 => "si",
+                Bit32 => "esi",
+                Bit64 => "rsi",
+            },
+            Rdi => match bit {
+                Bit8 => "dil",
+                Bit16 => "di",
+                Bit32 => "edi",
+                Bit64 => "rdi",
+            },
+            Rbp => match bit {
+                Bit8 => "bpl",
+                Bit16 => "bp",
+                Bit32 => "ebp",
+                Bit64 => "rbp",
+            },
+            Rsp => match bit {
+                Bit8 => "spl",
+                Bit16 => "sp",
+                Bit32 => "esp",
+                Bit64 => "rsp",
+            },
+            R8 => match bit {
+                Bit8 => "r8b",
+                Bit16 => "r8w",
+                Bit32 => "r8d",
+                Bit64 => "r8",
+            },
+            R9 => match bit {
+                Bit8 => "r9b",
+                Bit16 => "r9w",
+                Bit32 => "r9d",
+                Bit64 => "r9",
+            },
+            R10 => match bit {
+                Bit8 => "r10b",
+                Bit16 => "r10w",
+                Bit32 => "r10d",
+                Bit64 => "r10",
+            },
+            R11 => match bit {
+                Bit8 => "r11b",
+                Bit16 => "r11w",
+                Bit32 => "r11d",
+                Bit64 => "r11",
+            },
+            R12 => match bit {
+                Bit8 => "r12b",
+                Bit16 => "r12w",
+                Bit32 => "r12d",
+                Bit64 => "r12",
+            },
+            R13 => match bit {
+                Bit8 => "r13b",
+                Bit16 => "r13w",
+                Bit32 => "r13d",
+                Bit64 => "r13",
+            },
+            R14 => match bit {
+                Bit8 => "r14b",
+                Bit16 => "r14w",
+                Bit32 => "r14d",
+                Bit64 => "r14",
+            },
+            R15 => match bit {
+                Bit8 => "r15b",
+                Bit16 => "r15w",
+                Bit32 => "r15d",
+                Bit64 => "r15",
+            },
+        }
+    }
+}
 
 #[derive(Debug)]
 struct Generator {
@@ -50,7 +176,7 @@ impl FuncGenerator {
             .iter()
             .scan(8 /* rbpの分 */, |acc, local| {
                 let offset = *acc;
-                *acc += local.ty.size();
+                *acc += local.bit.to_size();
                 Some(offset)
             })
             .collect::<Vec<_>>();
@@ -69,7 +195,7 @@ impl FuncGenerator {
         let locals_size = func
             .locals
             .iter()
-            .map(|local| local.ty.size())
+            .map(|local| local.bit.to_size())
             .sum::<usize>();
 
         self.buf.append(format!("{}:\n", func.name));
@@ -91,9 +217,11 @@ impl FuncGenerator {
     fn local(&self, local: usize) -> String {
         format!(
             "{} PTR [rbp-{}]",
-            match self.locals[local].ty {
-                tac::Type::Int => "DWORD",
-                tac::Type::Int64 => "QWORD",
+            match self.locals[local].bit {
+                Bit::Bit8 => "BYTE",
+                Bit::Bit16 => "WORD",
+                Bit::Bit32 => "DWORD",
+                Bit::Bit64 => "QWORD",
             },
             self.local_offsets[local]
         )

@@ -1,3 +1,4 @@
+mod bit;
 pub mod buf;
 pub mod clang;
 pub mod generator;
@@ -7,3 +8,4 @@ pub mod parser;
 pub mod tac;
 pub mod tac_generator;
 pub mod token;
+pub use bit::Bit;

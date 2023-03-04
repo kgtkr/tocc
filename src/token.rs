@@ -37,4 +37,5 @@ pub enum TokenPayload {
     Else,
     While,
     For,
+    Comma,
 }

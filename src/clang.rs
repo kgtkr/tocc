@@ -108,6 +108,7 @@ pub enum ExprPayload {
     Ge(ExprGe),
     LValue(ExprLValue),
     Assign(ExprAssign),
+    Call(ExprCall),
 }
 
 #[derive(Debug, Clone)]
@@ -194,4 +195,10 @@ pub struct LValueVar {
 pub struct ExprAssign {
     pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprCall {
+    pub name: String,
+    pub args: Vec<Expr>,
 }

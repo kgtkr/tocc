@@ -1,6 +1,6 @@
 use crate::clang::{
-    Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprAssign, ExprDiv, ExprEq, ExprGe, ExprGt,
-    ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload, ExprSub,
+    Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprAssign, ExprCall, ExprDiv, ExprEq, ExprGe,
+    ExprGt, ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload, ExprSub,
     LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf, StmtPayload, StmtReturn,
     StmtVarDecl, StmtWhile, Type,
 };
@@ -162,6 +162,22 @@ impl Parser {
         })
     }
 
+    fn sep_by<T>(
+        &mut self,
+        f: impl Fn(&mut Self) -> Result<T, ParseError>,
+        sep: impl Fn(&mut Self) -> Result<(), ParseError>,
+    ) -> Result<Vec<T>, ParseError> {
+        let mut result = Vec::new();
+        if let Some(x) = self.optional(|p| f(p))? {
+            result.push(x);
+            result.extend(self.many(|p| {
+                sep(p)?;
+                f(p)
+            })?);
+        }
+        Ok(result)
+    }
+
     fn primary(&mut self) -> Result<Expr, ParseError> {
         parser_or!(
             self,
@@ -194,10 +210,30 @@ impl Parser {
                         expected: "identifier".to_string(),
                     }),
                 })?;
-                Ok(Expr {
-                    loc: token.loc,
-                    payload: ExprPayload::LValue(ExprLValue::Var(LValueVar { name: ident })),
-                })
+                if let Some(_) = p.optional(|p| {
+                    p.satisfy_(
+                        |token| matches!(token.payload, TokenPayload::ParenOpen),
+                        "(",
+                    )
+                })? {
+                    let args = p.sep_by(
+                        |p| p.expr(),
+                        |p| p.satisfy_(|token| matches!(token.payload, TokenPayload::Comma), ","),
+                    )?;
+                    p.satisfy_(
+                        |token| matches!(token.payload, TokenPayload::ParenClose),
+                        ")",
+                    )?;
+                    Ok(Expr {
+                        loc: token.loc,
+                        payload: ExprPayload::Call(ExprCall { name: ident, args }),
+                    })
+                } else {
+                    Ok(Expr {
+                        loc: token.loc,
+                        payload: ExprPayload::LValue(ExprLValue::Var(LValueVar { name: ident })),
+                    })
+                }
             },
         )
     }

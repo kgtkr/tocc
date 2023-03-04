@@ -248,6 +248,7 @@ impl FuncGenerator {
             Jump(x) => self.instr_jump(x),
             JumpIf(x) => self.instr_jump_if(x),
             JumpIfNot(x) => self.instr_jump_if_not(x),
+            Call(x) => self.instr_call(x),
         }
     }
 
@@ -374,6 +375,57 @@ impl FuncGenerator {
         self.buf.append(format!("cmp eax, 0\n"));
         self.buf
             .append(format!("je .L.{}.{}\n", self.func_name, x.label));
+    }
+
+    fn instr_call(&mut self, x: tac::InstrCall) {
+        if let Some(arg) = x.args.get(0) {
+            self.buf.append(format!("mov rdi, {}\n", self.local(*arg)));
+        }
+
+        if let Some(arg) = x.args.get(1) {
+            self.buf.append(format!("mov rsi, {}\n", self.local(*arg)));
+        }
+
+        if let Some(arg) = x.args.get(2) {
+            self.buf.append(format!("mov rdx, {}\n", self.local(*arg)));
+        }
+
+        if let Some(arg) = x.args.get(3) {
+            self.buf.append(format!("mov rcx, {}\n", self.local(*arg)));
+        }
+
+        if let Some(arg) = x.args.get(4) {
+            self.buf.append(format!("mov r8, {}\n", self.local(*arg)));
+        }
+
+        if let Some(arg) = x.args.get(5) {
+            self.buf.append(format!("mov r9, {}\n", self.local(*arg)));
+        }
+
+        let extra_args_size= if x.args.len() > 6 {
+            let extra_args_size = x
+                .args
+                .iter()
+                .skip(6)
+                .map(|&_arg| 
+                    // TODO:
+                    4
+                )
+                .sum::<usize>();
+            let extra_args_size = extra_args_size + (extra_args_size % 16);
+            self.buf.append(format!("sub rsp, {}\n", extra_args_size));
+            for (i, arg) in x.args.iter().enumerate().skip(6) {
+                self.buf.append(format!("mov rax, {}\n", self.local(*arg)));
+                self.buf.append(format!("mov [rsp + {}], rax\n", i * 4));
+            }
+            extra_args_size
+        } else {
+            0
+        };
+
+        self.buf.append(format!("call {}\n", x.name));
+        self.buf.append(format!("add rsp, {}\n", extra_args_size));
+        self.buf.append(format!("mov {}, rax\n", self.local(x.dst)));
     }
 }
 

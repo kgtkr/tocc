@@ -173,6 +173,7 @@ impl InstrGenerator {
             Ge(x) => self.expr_ge(x),
             LValue(x) => self.expr_lvalue(x),
             Assign(x) => self.expr_assign(x),
+            Call(x) => self.expr_call(x),
         }
     }
 
@@ -321,6 +322,23 @@ impl InstrGenerator {
         let src = self.lvalue(x);
         self.instrs.push(tac::Instr {
             payload: tac::InstrPayload::Deref(tac::InstrDeref { dst, src }),
+        });
+        dst
+    }
+
+    fn expr_call(&mut self, x: clang::ExprCall) -> usize {
+        let dst = self.generate_local(Bit::Bit32);
+        let args = x
+            .args
+            .into_iter()
+            .map(|arg| self.expr(arg))
+            .collect::<Vec<_>>();
+        self.instrs.push(tac::Instr {
+            payload: tac::InstrPayload::Call(tac::InstrCall {
+                dst,
+                name: x.name,
+                args,
+            }),
         });
         dst
     }

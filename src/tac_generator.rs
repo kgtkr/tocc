@@ -64,9 +64,11 @@ impl InstrGenerator {
     }
 
     fn stmt_compound(&mut self, x: StmtCompound) {
+        let prev_local_idents = self.local_idents.clone();
         for stmt in x.stmts {
             self.stmt(stmt);
         }
+        self.local_idents = prev_local_idents;
     }
 
     fn stmt_var_decl(&mut self, x: StmtVarDecl) {

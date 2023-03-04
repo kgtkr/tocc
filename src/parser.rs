@@ -629,6 +629,8 @@ impl Parser {
     }
 
     fn func_decl(&mut self) -> Result<DeclFunc, ParseError> {
+        let typ = self.typ()?;
+
         let name = self.satisfy(|token| match &token.payload {
             TokenPayload::Ident(name) => Ok(name.clone()),
             _ => Err(ParseErrorPayload::UnexpectedToken {
@@ -661,6 +663,7 @@ impl Parser {
             name: name.clone(),
             params,
             body: stmts,
+            typ,
         })
     }
 

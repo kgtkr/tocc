@@ -96,7 +96,7 @@ expr_test() {
   expr_test_count=$((expr_test_count + 1))
 
   mkdir -p "$DIR"
-  echo "main() { return $EXPR; }" > "$DIR/main.c"
+  echo "int main() { return $EXPR; }" > "$DIR/main.c"
   echo "$RESULT" > "$DIR/status"
 }
 rm -rf fixtures/_expr_test_*

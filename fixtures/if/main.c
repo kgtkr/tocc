@@ -1,4 +1,4 @@
-main() {
+int main() {
     int result;
     result = 1;
     if (1) {

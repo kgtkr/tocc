@@ -1,4 +1,4 @@
-main() {
+int main() {
     int foo;
     foo = 1;
     int bar;

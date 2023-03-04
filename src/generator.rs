@@ -247,6 +247,7 @@ impl FuncGenerator {
             Label(x) => self.instr_label(x),
             Jump(x) => self.instr_jump(x),
             JumpIf(x) => self.instr_jump_if(x),
+            JumpIfNot(x) => self.instr_jump_if_not(x),
         }
     }
 
@@ -351,12 +352,12 @@ impl FuncGenerator {
 
     fn instr_label(&mut self, x: tac::InstrLabel) {
         self.buf
-            .append(format!(".L.{}.{}:", self.func_name, x.label));
+            .append(format!(".L.{}.{}:\n", self.func_name, x.label));
     }
 
     fn instr_jump(&mut self, x: tac::InstrJump) {
         self.buf
-            .append(format!("jmp .L.{}.{}", self.func_name, x.label));
+            .append(format!("jmp .L.{}.{}\n", self.func_name, x.label));
     }
 
     fn instr_jump_if(&mut self, x: tac::InstrJumpIf) {
@@ -364,7 +365,15 @@ impl FuncGenerator {
             .append(format!("mov eax, {}\n", self.local(x.cond)));
         self.buf.append(format!("cmp eax, 0\n"));
         self.buf
-            .append(format!("jen .L.{}.{}", self.func_name, x.label));
+            .append(format!("jne .L.{}.{}\n", self.func_name, x.label));
+    }
+
+    fn instr_jump_if_not(&mut self, x: tac::InstrJumpIfNot) {
+        self.buf
+            .append(format!("mov eax, {}\n", self.local(x.cond)));
+        self.buf.append(format!("cmp eax, 0\n"));
+        self.buf
+            .append(format!("je .L.{}.{}\n", self.func_name, x.label));
     }
 }
 

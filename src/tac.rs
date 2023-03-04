@@ -51,6 +51,7 @@ pub enum InstrPayload {
     Label(InstrLabel),
     Jump(InstrJump),
     JumpIf(InstrJumpIf),
+    JumpIfNot(InstrJumpIfNot),
 }
 
 #[derive(Debug, Clone)]
@@ -156,6 +157,12 @@ pub struct InstrJump {
 
 #[derive(Debug, Clone)]
 pub struct InstrJumpIf {
+    pub label: usize,
+    pub cond: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrJumpIfNot {
     pub label: usize,
     pub cond: usize,
 }

@@ -75,21 +75,14 @@ impl InstrGenerator {
     }
 
     fn stmt_if(&mut self, x: StmtIf) {
-        let cond_neg = self.generate_local(Bit::Bit32);
         let else_label = self.generate_label();
         let end_label = self.generate_label();
 
         let cond = self.expr(x.cond.clone());
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Neg(tac::InstrNeg {
-                src: cond,
-                dst: cond_neg,
-            }),
-        });
 
         self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::JumpIf(tac::InstrJumpIf {
-                cond: cond_neg,
+            payload: tac::InstrPayload::JumpIfNot(tac::InstrJumpIfNot {
+                cond: cond,
                 label: else_label,
             }),
         });
@@ -112,21 +105,14 @@ impl InstrGenerator {
     fn stmt_while(&mut self, x: clang::StmtWhile) {
         let cond_label = self.generate_label();
         let end_label = self.generate_label();
-        let cond_neg = self.generate_local(Bit::Bit32);
 
         self.instrs.push(tac::Instr {
             payload: tac::InstrPayload::Label(tac::InstrLabel { label: cond_label }),
         });
         let cond = self.expr(x.cond.clone());
         self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Neg(tac::InstrNeg {
-                src: cond,
-                dst: cond_neg,
-            }),
-        });
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::JumpIf(tac::InstrJumpIf {
-                cond: cond_neg,
+            payload: tac::InstrPayload::JumpIfNot(tac::InstrJumpIfNot {
+                cond: cond,
                 label: end_label,
             }),
         });
@@ -142,7 +128,6 @@ impl InstrGenerator {
     fn stmt_for(&mut self, x: clang::StmtFor) {
         let cond_label = self.generate_label();
         let end_label = self.generate_label();
-        let cond_neg = self.generate_local(Bit::Bit32);
 
         if let Some(init) = x.init {
             self.expr(init);
@@ -153,14 +138,8 @@ impl InstrGenerator {
         if let Some(cond) = x.cond {
             let cond = self.expr(cond);
             self.instrs.push(tac::Instr {
-                payload: tac::InstrPayload::Neg(tac::InstrNeg {
-                    src: cond,
-                    dst: cond_neg,
-                }),
-            });
-            self.instrs.push(tac::Instr {
-                payload: tac::InstrPayload::JumpIf(tac::InstrJumpIf {
-                    cond: cond_neg,
+                payload: tac::InstrPayload::JumpIfNot(tac::InstrJumpIfNot {
+                    cond: cond,
                     label: end_label,
                 }),
             });

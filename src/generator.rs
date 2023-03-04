@@ -379,27 +379,27 @@ impl FuncGenerator {
 
     fn instr_call(&mut self, x: tac::InstrCall) {
         if let Some(arg) = x.args.get(0) {
-            self.buf.append(format!("mov rdi, {}\n", self.local(*arg)));
+            self.buf.append(format!("mov edi, {}\n", self.local(*arg)));
         }
 
         if let Some(arg) = x.args.get(1) {
-            self.buf.append(format!("mov rsi, {}\n", self.local(*arg)));
+            self.buf.append(format!("mov esi, {}\n", self.local(*arg)));
         }
 
         if let Some(arg) = x.args.get(2) {
-            self.buf.append(format!("mov rdx, {}\n", self.local(*arg)));
+            self.buf.append(format!("mov edx, {}\n", self.local(*arg)));
         }
 
         if let Some(arg) = x.args.get(3) {
-            self.buf.append(format!("mov rcx, {}\n", self.local(*arg)));
+            self.buf.append(format!("mov ecx, {}\n", self.local(*arg)));
         }
 
         if let Some(arg) = x.args.get(4) {
-            self.buf.append(format!("mov r8, {}\n", self.local(*arg)));
+            self.buf.append(format!("mov r8d, {}\n", self.local(*arg)));
         }
 
         if let Some(arg) = x.args.get(5) {
-            self.buf.append(format!("mov r9, {}\n", self.local(*arg)));
+            self.buf.append(format!("mov r9d, {}\n", self.local(*arg)));
         }
 
         let extra_args_size= if x.args.len() > 6 {
@@ -425,7 +425,7 @@ impl FuncGenerator {
 
         self.buf.append(format!("call {}\n", x.name));
         self.buf.append(format!("add rsp, {}\n", extra_args_size));
-        self.buf.append(format!("mov {}, rax\n", self.local(x.dst)));
+        self.buf.append(format!("mov {}, eax\n", self.local(x.dst)));
     }
 }
 

@@ -209,6 +209,36 @@ impl FuncGenerator {
         };
         self.buf
             .append(format!("sub rsp, {}\n", locals_size + locals_pad));
+        if func.args_count >= 1 {
+            self.buf.append(format!("mov {}, edi\n", self.local(0)));
+        }
+        if func.args_count >= 2 {
+            self.buf.append(format!("mov {}, esi\n", self.local(1)));
+        }
+        if func.args_count >= 3 {
+            self.buf.append(format!("mov {}, edx\n", self.local(2)));
+        }
+        if func.args_count >= 4 {
+            self.buf.append(format!("mov {}, ecx\n", self.local(3)));
+        }
+        if func.args_count >= 5 {
+            self.buf.append(format!("mov {}, r8d\n", self.local(4)));
+        }
+        if func.args_count >= 6 {
+            self.buf.append(format!("mov {}, r9d\n", self.local(5)));
+        }
+        if func.args_count >= 7 {
+            for i in 0..(func.args_count - 6) {
+                self.buf.append(format!(
+                    "mov eax, DWORD PTR [rbp+{}]\n",
+                    4 * i + 16
+                ));
+                self.buf.append(format!(
+                    "mov {}, eax\n",
+                    self.local(6 + i),
+                ));
+            }
+        }
         for instr in func.instrs {
             self.instr(instr);
         }
@@ -415,8 +445,8 @@ impl FuncGenerator {
             let extra_args_size = extra_args_size + (extra_args_size % 16);
             self.buf.append(format!("sub rsp, {}\n", extra_args_size));
             for (i, arg) in x.args.iter().enumerate().skip(6) {
-                self.buf.append(format!("mov rax, {}\n", self.local(*arg)));
-                self.buf.append(format!("mov [rsp + {}], rax\n", i * 4));
+                self.buf.append(format!("mov eax, {}\n", self.local(*arg)));
+                self.buf.append(format!("mov DWORD PTR [rsp + {}], eax\n", (i - 6) * 4));
             }
             extra_args_size
         } else {

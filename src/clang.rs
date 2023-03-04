@@ -24,7 +24,14 @@ pub enum DeclPayload {
 #[derive(Debug, Clone)]
 pub struct DeclFunc {
     pub name: String,
+    pub params: Vec<DeclParam>,
     pub body: StmtCompound,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeclParam {
+    pub typ: Type,
+    pub name: String,
 }
 
 #[derive(Debug, Clone)]

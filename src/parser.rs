@@ -1,8 +1,8 @@
 use crate::clang::{
-    Decl, DeclFunc, DeclPayload, Expr, ExprAdd, ExprAssign, ExprCall, ExprDiv, ExprEq, ExprGe,
-    ExprGt, ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload, ExprSub,
-    LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf, StmtPayload, StmtReturn,
-    StmtVarDecl, StmtWhile, Type,
+    Decl, DeclFunc, DeclParam, DeclPayload, Expr, ExprAdd, ExprAssign, ExprCall, ExprDiv, ExprEq,
+    ExprGe, ExprGt, ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload,
+    ExprSub, LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf, StmtPayload,
+    StmtReturn, StmtVarDecl, StmtWhile, Type,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -639,6 +639,19 @@ impl Parser {
             |token| matches!(token.payload, TokenPayload::ParenOpen),
             "(",
         )?;
+        let params = self.sep_by(
+            |p| {
+                let typ = p.typ()?;
+                let name = p.satisfy(|token| match &token.payload {
+                    TokenPayload::Ident(name) => Ok(name.clone()),
+                    _ => Err(ParseErrorPayload::UnexpectedToken {
+                        expected: "identifier".to_string(),
+                    }),
+                })?;
+                Ok(DeclParam { typ, name })
+            },
+            |p| p.satisfy_(|token| matches!(token.payload, TokenPayload::Comma), ","),
+        )?;
         self.satisfy_(
             |token| matches!(token.payload, TokenPayload::ParenClose),
             ")",
@@ -646,6 +659,7 @@ impl Parser {
         let stmts = self.compound_stmt()?;
         Ok(DeclFunc {
             name: name.clone(),
+            params,
             body: stmts,
         })
     }

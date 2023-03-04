@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::clang::{
     self, DeclPayload, Expr, ExprIntLit, ExprPayload, Program, Stmt, StmtCompound, StmtExpr,
-    StmtIf, StmtPayload, StmtReturn, StmtVarDecl,
+    StmtIf, StmtPayload, StmtReturn, StmtVarDecl, Type,
 };
 use crate::{tac, Bit};
 #[derive(Debug)]
@@ -369,10 +369,22 @@ pub fn generate(program: Program) -> tac::Program {
             match decl.payload {
                 Func(x) => {
                     let mut gen = InstrGenerator::new();
+                    gen.local_idents.extend(
+                        x.params
+                            .iter()
+                            .enumerate()
+                            .map(|(i, param)| (param.name.clone(), i)),
+                    );
+                    gen.locals.extend(x.params.iter().map(|param| tac::Local {
+                        bit: match param.typ {
+                            Type::Int => Bit::Bit32,
+                        },
+                    }));
                     gen.stmt_compound(x.body);
                     tac::Decl {
                         payload: tac::DeclPayload::Func(tac::DeclFunc {
                             name: x.name,
+                            args_count: x.params.len(),
                             locals: gen.locals,
                             instrs: gen.instrs,
                         }),

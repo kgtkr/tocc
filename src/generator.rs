@@ -229,14 +229,10 @@ impl FuncGenerator {
         }
         if func.args_count >= 7 {
             for i in 0..(func.args_count - 6) {
-                self.buf.append(format!(
-                    "mov eax, DWORD PTR [rbp+{}]\n",
-                    4 * i + 16
-                ));
-                self.buf.append(format!(
-                    "mov {}, eax\n",
-                    self.local(6 + i),
-                ));
+                self.buf
+                    .append(format!("mov eax, DWORD PTR [rbp+{}]\n", 4 * i + 16));
+                self.buf
+                    .append(format!("mov {}, eax\n", self.local(6 + i),));
             }
         }
         for instr in func.instrs {
@@ -432,21 +428,21 @@ impl FuncGenerator {
             self.buf.append(format!("mov r9d, {}\n", self.local(*arg)));
         }
 
-        let extra_args_size= if x.args.len() > 6 {
+        let extra_args_size = if x.args.len() > 6 {
             let extra_args_size = x
                 .args
                 .iter()
                 .skip(6)
-                .map(|&_arg| 
+                .map(|&_arg|
                     // TODO:
-                    4
-                )
+                    4)
                 .sum::<usize>();
             let extra_args_size = extra_args_size + (extra_args_size % 16);
             self.buf.append(format!("sub rsp, {}\n", extra_args_size));
             for (i, arg) in x.args.iter().enumerate().skip(6) {
                 self.buf.append(format!("mov eax, {}\n", self.local(*arg)));
-                self.buf.append(format!("mov DWORD PTR [rsp + {}], eax\n", (i - 6) * 4));
+                self.buf
+                    .append(format!("mov DWORD PTR [rsp + {}], eax\n", (i - 6) * 4));
             }
             extra_args_size
         } else {

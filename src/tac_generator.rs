@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 use crate::clang::{
@@ -25,8 +26,12 @@ impl InstrGenerator {
 
     fn add_named_local(&mut self, name: String, bit: Bit) -> usize {
         let local = self.generate_local(bit);
-        self.local_idents.insert(name, local);
-        local
+        if let Entry::Vacant(entry) = self.local_idents.entry(name.clone()) {
+            entry.insert(local);
+            local
+        } else {
+            panic!("local variable {} is already defined", name);
+        }
     }
 
     fn generate_local(&mut self, bit: Bit) -> usize {

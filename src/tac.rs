@@ -23,6 +23,7 @@ pub enum DeclPayload {
 #[derive(Debug, Clone)]
 pub struct DeclFunc {
     pub name: String,
+    // localsの先頭args_countに引数が入る
     pub args_count: usize,
     pub locals: Vec<Local>,
     pub instrs: Vec<Instr>,

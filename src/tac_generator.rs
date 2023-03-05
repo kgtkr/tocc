@@ -23,6 +23,12 @@ impl InstrGenerator {
         }
     }
 
+    fn add_named_local(&mut self, name: String, bit: Bit) -> usize {
+        let local = self.generate_local(bit);
+        self.local_idents.insert(name, local);
+        local
+    }
+
     fn generate_local(&mut self, bit: Bit) -> usize {
         let local = self.locals.len();
         self.locals.push(tac::Local { bit });
@@ -72,8 +78,7 @@ impl InstrGenerator {
     }
 
     fn stmt_var_decl(&mut self, x: StmtVarDecl) {
-        let local = self.generate_local(Bit::Bit32);
-        self.local_idents.insert(x.name, local);
+        self.add_named_local(x.name, Bit::Bit32);
     }
 
     fn stmt_if(&mut self, x: StmtIf) {
@@ -371,17 +376,9 @@ pub fn generate(program: Program) -> tac::Program {
             match decl.payload {
                 Func(x) => {
                     let mut gen = InstrGenerator::new();
-                    gen.local_idents.extend(
-                        x.params
-                            .iter()
-                            .enumerate()
-                            .map(|(i, param)| (param.name.clone(), i)),
-                    );
-                    gen.locals.extend(x.params.iter().map(|param| tac::Local {
-                        bit: match param.typ {
-                            Type::Int => Bit::Bit32,
-                        },
-                    }));
+                    for param in &x.params {
+                        gen.add_named_local(param.name.clone(), Bit::Bit32);
+                    }
                     gen.stmt_compound(x.body);
                     tac::Decl {
                         payload: tac::DeclPayload::Func(tac::DeclFunc {

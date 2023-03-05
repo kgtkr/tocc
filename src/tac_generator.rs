@@ -3,9 +3,18 @@ use std::collections::HashMap;
 
 use crate::clang::{
     self, DeclPayload, Expr, ExprIntLit, ExprPayload, Program, Stmt, StmtCompound, StmtExpr,
-    StmtIf, StmtPayload, StmtReturn, StmtVarDecl, Type,
+    StmtIf, StmtPayload, StmtReturn, StmtVarDecl,
 };
 use crate::{tac, Bit};
+use thiserror::Error;
+
+#[derive(Error, Debug, Clone)]
+#[error("{message}")]
+pub struct CodegenError {
+    // loc: Loc,
+    message: String,
+}
+
 #[derive(Debug)]
 struct InstrGenerator {
     locals: Vec<tac::Local>,
@@ -24,13 +33,15 @@ impl InstrGenerator {
         }
     }
 
-    fn add_named_local(&mut self, name: String, bit: Bit) -> usize {
+    fn add_named_local(&mut self, name: String, bit: Bit) -> Result<usize, CodegenError> {
         let local = self.generate_local(bit);
         if let Entry::Vacant(entry) = self.local_idents.entry(name.clone()) {
             entry.insert(local);
-            local
+            Ok(local)
         } else {
-            panic!("local variable {} is already defined", name);
+            Err(CodegenError {
+                message: format!("local variable {} is already defined", name),
+            })
         }
     }
 
@@ -46,7 +57,7 @@ impl InstrGenerator {
         label
     }
 
-    fn stmt(&mut self, stmt: Stmt) {
+    fn stmt(&mut self, stmt: Stmt) -> Result<(), CodegenError> {
         use StmtPayload::*;
         match stmt.payload {
             Expr(x) => {
@@ -55,12 +66,13 @@ impl InstrGenerator {
             Return(x) => {
                 self.stmt_return(x);
             }
-            Compound(x) => self.stmt_compound(x),
-            VarDecl(x) => self.stmt_var_decl(x),
-            If(x) => self.stmt_if(x),
-            While(x) => self.stmt_while(x),
-            For(x) => self.stmt_for(x),
+            Compound(x) => self.stmt_compound(x)?,
+            VarDecl(x) => self.stmt_var_decl(x)?,
+            If(x) => self.stmt_if(x)?,
+            While(x) => self.stmt_while(x)?,
+            For(x) => self.stmt_for(x)?,
         }
+        Ok(())
     }
 
     fn stmt_expr(&mut self, x: StmtExpr) {
@@ -74,19 +86,21 @@ impl InstrGenerator {
         });
     }
 
-    fn stmt_compound(&mut self, x: StmtCompound) {
+    fn stmt_compound(&mut self, x: StmtCompound) -> Result<(), CodegenError> {
         let prev_local_idents = self.local_idents.clone();
         for stmt in x.stmts {
-            self.stmt(stmt);
+            self.stmt(stmt)?;
         }
         self.local_idents = prev_local_idents;
+        Ok(())
     }
 
-    fn stmt_var_decl(&mut self, x: StmtVarDecl) {
-        self.add_named_local(x.name, Bit::Bit32);
+    fn stmt_var_decl(&mut self, x: StmtVarDecl) -> Result<(), CodegenError> {
+        self.add_named_local(x.name, Bit::Bit32)?;
+        Ok(())
     }
 
-    fn stmt_if(&mut self, x: StmtIf) {
+    fn stmt_if(&mut self, x: StmtIf) -> Result<(), CodegenError> {
         let else_label = self.generate_label();
         let end_label = self.generate_label();
 
@@ -94,12 +108,12 @@ impl InstrGenerator {
 
         self.instrs.push(tac::Instr {
             payload: tac::InstrPayload::JumpIfNot(tac::InstrJumpIfNot {
-                cond: cond,
+                cond,
                 label: else_label,
             }),
         });
 
-        self.stmt(*x.then);
+        self.stmt(*x.then)?;
         self.instrs.push(tac::Instr {
             payload: tac::InstrPayload::Jump(tac::InstrJump { label: end_label }),
         });
@@ -107,14 +121,15 @@ impl InstrGenerator {
             payload: tac::InstrPayload::Label(tac::InstrLabel { label: else_label }),
         });
         if let Some(else_) = x.else_ {
-            self.stmt(*else_);
+            self.stmt(*else_)?;
         }
         self.instrs.push(tac::Instr {
             payload: tac::InstrPayload::Label(tac::InstrLabel { label: end_label }),
         });
+        Ok(())
     }
 
-    fn stmt_while(&mut self, x: clang::StmtWhile) {
+    fn stmt_while(&mut self, x: clang::StmtWhile) -> Result<(), CodegenError> {
         let cond_label = self.generate_label();
         let end_label = self.generate_label();
 
@@ -124,20 +139,21 @@ impl InstrGenerator {
         let cond = self.expr(x.cond.clone());
         self.instrs.push(tac::Instr {
             payload: tac::InstrPayload::JumpIfNot(tac::InstrJumpIfNot {
-                cond: cond,
+                cond,
                 label: end_label,
             }),
         });
-        self.stmt(*x.body);
+        self.stmt(*x.body)?;
         self.instrs.push(tac::Instr {
             payload: tac::InstrPayload::Jump(tac::InstrJump { label: cond_label }),
         });
         self.instrs.push(tac::Instr {
             payload: tac::InstrPayload::Label(tac::InstrLabel { label: end_label }),
         });
+        Ok(())
     }
 
-    fn stmt_for(&mut self, x: clang::StmtFor) {
+    fn stmt_for(&mut self, x: clang::StmtFor) -> Result<(), CodegenError> {
         let cond_label = self.generate_label();
         let end_label = self.generate_label();
 
@@ -151,12 +167,12 @@ impl InstrGenerator {
             let cond = self.expr(cond);
             self.instrs.push(tac::Instr {
                 payload: tac::InstrPayload::JumpIfNot(tac::InstrJumpIfNot {
-                    cond: cond,
+                    cond,
                     label: end_label,
                 }),
             });
         }
-        self.stmt(*x.body.clone());
+        self.stmt(*x.body.clone())?;
         if let Some(step) = x.step {
             self.expr(step);
         }
@@ -166,6 +182,7 @@ impl InstrGenerator {
         self.instrs.push(tac::Instr {
             payload: tac::InstrPayload::Label(tac::InstrLabel { label: end_label }),
         });
+        Ok(())
     }
 
     fn expr(&mut self, expr: Expr) -> usize {
@@ -372,7 +389,7 @@ impl InstrGenerator {
     }
 }
 
-pub fn generate(program: Program) -> tac::Program {
+pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
     let decls = program
         .decls
         .into_iter()
@@ -382,21 +399,21 @@ pub fn generate(program: Program) -> tac::Program {
                 Func(x) => {
                     let mut gen = InstrGenerator::new();
                     for param in &x.params {
-                        gen.add_named_local(param.name.clone(), Bit::Bit32);
+                        gen.add_named_local(param.name.clone(), Bit::Bit32)?;
                     }
-                    gen.stmt_compound(x.body);
-                    tac::Decl {
+                    gen.stmt_compound(x.body)?;
+                    Ok(tac::Decl {
                         payload: tac::DeclPayload::Func(tac::DeclFunc {
                             name: x.name,
                             args_count: x.params.len(),
                             locals: gen.locals,
                             instrs: gen.instrs,
                         }),
-                    }
+                    })
                 }
             }
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, CodegenError>>()?;
 
-    tac::Program { decls }
+    Ok(tac::Program { decls })
 }

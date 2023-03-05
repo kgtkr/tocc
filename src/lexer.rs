@@ -82,7 +82,7 @@ impl Lexer {
         let payload = match c {
             '0'..='9' => {
                 let mut num = c.to_digit(10).unwrap() as i64;
-                while let Ok(c) = self.expect(|c| c.is_digit(10)) {
+                while let Ok(c) = self.expect(|c| c.is_ascii_digit()) {
                     num = num * 10 + c.to_digit(10).unwrap() as i64; // TODO: overflow check
                 }
                 Some(TokenPayload::IntLit(num))

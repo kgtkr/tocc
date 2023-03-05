@@ -390,7 +390,7 @@ impl FuncGenerator {
     fn instr_jump_if(&mut self, x: tac::InstrJumpIf) {
         self.buf
             .append(format!("mov eax, {}\n", self.local(x.cond)));
-        self.buf.append(format!("cmp eax, 0\n"));
+        self.buf.append("cmp eax, 0\n");
         self.buf
             .append(format!("jne .L.{}.{}\n", self.func_name, x.label));
     }
@@ -398,7 +398,7 @@ impl FuncGenerator {
     fn instr_jump_if_not(&mut self, x: tac::InstrJumpIfNot) {
         self.buf
             .append(format!("mov eax, {}\n", self.local(x.cond)));
-        self.buf.append(format!("cmp eax, 0\n"));
+        self.buf.append("cmp eax, 0\n");
         self.buf
             .append(format!("je .L.{}.{}\n", self.func_name, x.label));
     }

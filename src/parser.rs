@@ -143,11 +143,8 @@ impl Parser {
         fold: impl Fn(R, T) -> R,
     ) -> Result<R, ParseError> {
         let mut result = init;
-        loop {
-            match self.optional(|p| f(p))? {
-                Some(t) => result = fold(result, t),
-                None => break,
-            }
+        while let Some(t) = self.optional(|p| f(p))? {
+            result = fold(result, t);
         }
         Ok(result)
     }
@@ -210,30 +207,43 @@ impl Parser {
                         expected: "identifier".to_string(),
                     }),
                 })?;
-                if let Some(_) = p.optional(|p| {
-                    p.satisfy_(
-                        |token| matches!(token.payload, TokenPayload::ParenOpen),
-                        "(",
-                    )
-                })? {
-                    let args = p.sep_by(
-                        |p| p.expr(),
-                        |p| p.satisfy_(|token| matches!(token.payload, TokenPayload::Comma), ","),
-                    )?;
-                    p.satisfy_(
-                        |token| matches!(token.payload, TokenPayload::ParenClose),
-                        ")",
-                    )?;
-                    Ok(Expr {
-                        loc: token.loc,
-                        payload: ExprPayload::Call(ExprCall { name: ident, args }),
-                    })
-                } else {
-                    Ok(Expr {
-                        loc: token.loc,
-                        payload: ExprPayload::LValue(ExprLValue::Var(LValueVar { name: ident })),
-                    })
-                }
+                parser_or!(
+                    p,
+                    |p| {
+                        p.satisfy_(
+                            |token| matches!(token.payload, TokenPayload::ParenOpen),
+                            "(",
+                        )?;
+                        let args = p.sep_by(
+                            |p| p.expr(),
+                            |p| {
+                                p.satisfy_(
+                                    |token| matches!(token.payload, TokenPayload::Comma),
+                                    ",",
+                                )
+                            },
+                        )?;
+                        p.satisfy_(
+                            |token| matches!(token.payload, TokenPayload::ParenClose),
+                            ")",
+                        )?;
+                        Ok(Expr {
+                            loc: token.loc.clone(),
+                            payload: ExprPayload::Call(ExprCall {
+                                name: ident.clone(),
+                                args,
+                            }),
+                        })
+                    },
+                    |_| {
+                        Ok(Expr {
+                            loc: token.loc.clone(),
+                            payload: ExprPayload::LValue(ExprLValue::Var(LValueVar {
+                                name: ident.clone(),
+                            })),
+                        })
+                    },
+                )
             },
         )
     }
@@ -456,18 +466,21 @@ impl Parser {
 
     fn assign(&mut self) -> Result<Expr, ParseError> {
         let expr = self.equality()?;
-        if let Ok(_) = self.satisfy_(|token| matches!(token.payload, TokenPayload::Eq), "=") {
-            let rhs = self.assign()?;
-            Ok(Expr {
-                loc: expr.loc.clone(),
-                payload: ExprPayload::Assign(ExprAssign {
-                    lhs: Box::new(expr),
-                    rhs: Box::new(rhs),
-                }),
-            })
-        } else {
-            Ok(expr)
-        }
+        parser_or!(
+            self,
+            |p| {
+                p.satisfy_(|token| matches!(token.payload, TokenPayload::Eq), "=")?;
+                let rhs = p.assign()?;
+                Ok(Expr {
+                    loc: expr.loc.clone(),
+                    payload: ExprPayload::Assign(ExprAssign {
+                        lhs: Box::new(expr.clone()),
+                        rhs: Box::new(rhs),
+                    }),
+                })
+            },
+            |_| Ok(expr.clone()),
+        )
     }
 
     fn expr(&mut self) -> Result<Expr, ParseError> {
@@ -660,7 +673,7 @@ impl Parser {
         )?;
         let stmts = self.compound_stmt()?;
         Ok(DeclFunc {
-            name: name.clone(),
+            name,
             params,
             body: stmts,
             typ,

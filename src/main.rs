@@ -18,7 +18,7 @@ fn main() -> Result<(), anyhow::Error> {
     let input = read_to_string(&args.input)?;
     let tokens = Lexer::new(args.input.clone(), input).tokenize()?;
     let clang = Parser::new(tokens).parse()?;
-    let tac = tac_generator::generate(clang);
+    let tac = tac_generator::generate(clang)?;
     let asm = generator::generate(tac);
     std::fs::write(&args.output, asm)?;
 

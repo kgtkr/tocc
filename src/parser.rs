@@ -204,7 +204,7 @@ impl Parser {
             },
             |p| {
                 let token = p.peek().clone();
-                let (name, name_loc) = p.satisfy(|token| match &token.payload {
+                let (ident, ident_loc) = p.satisfy(|token| match &token.payload {
                     TokenPayload::Ident(ident) => Ok((ident.clone(), token.loc.clone())),
                     _ => Err(ParseErrorPayload::UnexpectedToken {
                         expected: "identifier".to_string(),
@@ -234,8 +234,8 @@ impl Parser {
                         Ok(Expr {
                             loc: token.loc.clone(),
                             payload: ExprPayload::Call(ExprCall {
-                                name: name.clone(),
-                                name_loc: name_loc.clone(),
+                                ident: ident.clone(),
+                                ident_loc: ident_loc.clone(),
                                 args,
                             }),
                         })
@@ -244,8 +244,8 @@ impl Parser {
                         Ok(Expr {
                             loc: token.loc.clone(),
                             payload: ExprPayload::LValue(ExprLValue::Var(LValueVar {
-                                name: name.clone(),
-                                name_loc: name_loc.clone(),
+                                ident: ident.clone(),
+                                ident_loc: ident_loc.clone(),
                             })),
                         })
                     },
@@ -269,7 +269,7 @@ impl Parser {
                 Ok(Expr {
                     loc: expr.loc.clone(),
                     payload: ExprPayload::Neg(ExprNeg {
-                        minus_loc: minus.loc.clone(),
+                        minus_loc: minus.loc,
                         expr: Box::new(expr),
                     }),
                 })
@@ -559,8 +559,8 @@ impl Parser {
 
     fn var_decl_stmt(&mut self) -> Result<StmtVarDecl, ParseError> {
         let typ = self.typ()?;
-        let (name, name_loc) = self.satisfy(|token| match &token.payload {
-            TokenPayload::Ident(name) => Ok((name.clone(), token.loc.clone())),
+        let (ident, ident_loc) = self.satisfy(|token| match &token.payload {
+            TokenPayload::Ident(ident) => Ok((ident.clone(), token.loc.clone())),
             _ => Err(ParseErrorPayload::UnexpectedToken {
                 expected: "identifier".to_string(),
             }),
@@ -571,8 +571,8 @@ impl Parser {
         )?;
         Ok(StmtVarDecl {
             typ,
-            name,
-            name_loc,
+            ident,
+            ident_loc,
         })
     }
 
@@ -665,8 +665,8 @@ impl Parser {
     fn func_decl(&mut self) -> Result<DeclFunc, ParseError> {
         let typ = self.typ()?;
 
-        let (name, name_loc) = self.satisfy(|token| match &token.payload {
-            TokenPayload::Ident(name) => Ok((name.clone(), token.loc.clone())),
+        let (ident, ident_loc) = self.satisfy(|token| match &token.payload {
+            TokenPayload::Ident(ident) => Ok((ident.clone(), token.loc.clone())),
             _ => Err(ParseErrorPayload::UnexpectedToken {
                 expected: "identifier".to_string(),
             }),
@@ -678,16 +678,16 @@ impl Parser {
         let params = self.sep_by(
             |p| {
                 let typ = p.typ()?;
-                let (name, name_loc) = p.satisfy(|token| match &token.payload {
-                    TokenPayload::Ident(name) => Ok((name.clone(), token.loc.clone())),
+                let (ident, ident_loc) = p.satisfy(|token| match &token.payload {
+                    TokenPayload::Ident(ident) => Ok((ident.clone(), token.loc.clone())),
                     _ => Err(ParseErrorPayload::UnexpectedToken {
                         expected: "identifier".to_string(),
                     }),
                 })?;
                 Ok(DeclParam {
                     typ,
-                    name,
-                    name_loc,
+                    ident,
+                    ident_loc,
                 })
             },
             |p| {
@@ -701,8 +701,8 @@ impl Parser {
         )?;
         let stmts = self.compound_stmt()?;
         Ok(DeclFunc {
-            name,
-            name_loc,
+            ident,
+            ident_loc,
             params,
             body: stmts,
             typ,

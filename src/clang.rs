@@ -29,8 +29,8 @@ pub enum DeclPayload {
 #[derive(Debug, Clone)]
 pub struct DeclFunc {
     pub typ: Type,
-    pub name_loc: Loc,
-    pub name: String,
+    pub ident_loc: Loc,
+    pub ident: String,
     pub params: Vec<DeclParam>,
     pub body: StmtCompound,
 }
@@ -38,8 +38,8 @@ pub struct DeclFunc {
 #[derive(Debug, Clone)]
 pub struct DeclParam {
     pub typ: Type,
-    pub name: String,
-    pub name_loc: Loc,
+    pub ident: String,
+    pub ident_loc: Loc,
 }
 
 #[derive(Debug, Clone)]
@@ -79,8 +79,8 @@ pub struct StmtCompound {
 #[derive(Debug, Clone)]
 pub struct StmtVarDecl {
     pub typ: Type,
-    pub name: String,
-    pub name_loc: Loc,
+    pub ident: String,
+    pub ident_loc: Loc,
 }
 
 #[derive(Debug, Clone)]
@@ -211,8 +211,8 @@ pub struct ExprGe {
 
 #[derive(Debug, Clone)]
 pub struct LValueVar {
-    pub name: String,
-    pub name_loc: Loc,
+    pub ident: String,
+    pub ident_loc: Loc,
 }
 
 #[derive(Debug, Clone)]
@@ -223,7 +223,7 @@ pub struct ExprAssign {
 
 #[derive(Debug, Clone)]
 pub struct ExprCall {
-    pub name: String,
-    pub name_loc: Loc,
+    pub ident: String,
+    pub ident_loc: Loc,
     pub args: Vec<Expr>,
 }

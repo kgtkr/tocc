@@ -185,7 +185,7 @@ impl FuncGenerator {
             buf: Buf::new(),
             local_offsets,
             locals: func.locals.clone(),
-            func_name: func.name.clone(),
+            func_name: func.ident.clone(),
         };
         gen.decl_func(func);
         gen.buf
@@ -198,7 +198,7 @@ impl FuncGenerator {
             .map(|local| local.bit.to_size())
             .sum::<usize>();
 
-        self.buf.append(format!("{}:\n", func.name));
+        self.buf.append(format!("{}:\n", func.ident));
         self.buf.append("push rbp\n");
         self.buf.append("mov rbp, rsp\n");
         let stack_size = locals_size + 8 /* rbpの分 */;
@@ -449,7 +449,7 @@ impl FuncGenerator {
             0
         };
 
-        self.buf.append(format!("call {}\n", x.name));
+        self.buf.append(format!("call {}\n", x.ident));
         self.buf.append(format!("add rsp, {}\n", extra_args_size));
         self.buf.append(format!("mov {}, eax\n", self.local(x.dst)));
     }

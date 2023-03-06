@@ -33,14 +33,14 @@ impl InstrGenerator {
         }
     }
 
-    fn add_named_local(&mut self, name: String, bit: Bit) -> Result<usize, CodegenError> {
+    fn add_named_local(&mut self, ident: String, bit: Bit) -> Result<usize, CodegenError> {
         let local = self.generate_local(bit);
-        if let Entry::Vacant(entry) = self.local_idents.entry(name.clone()) {
+        if let Entry::Vacant(entry) = self.local_idents.entry(ident.clone()) {
             entry.insert(local);
             Ok(local)
         } else {
             Err(CodegenError {
-                message: format!("local variable {} is already defined", name),
+                message: format!("local variable {} is already defined", ident),
             })
         }
     }
@@ -96,7 +96,7 @@ impl InstrGenerator {
     }
 
     fn stmt_var_decl(&mut self, x: StmtVarDecl) -> Result<(), CodegenError> {
-        self.add_named_local(x.name, Bit::Bit32)?;
+        self.add_named_local(x.ident, Bit::Bit32)?;
         Ok(())
     }
 
@@ -365,7 +365,7 @@ impl InstrGenerator {
         self.instrs.push(tac::Instr {
             payload: tac::InstrPayload::Call(tac::InstrCall {
                 dst,
-                name: x.name,
+                ident: x.ident,
                 args,
             }),
         });
@@ -381,7 +381,10 @@ impl InstrGenerator {
 
     fn lvalue_var(&mut self, x: clang::LValueVar) -> usize {
         let dst = self.generate_local(Bit::Bit64);
-        let src = *self.local_idents.get(&x.name).expect("undeclared variable");
+        let src = *self
+            .local_idents
+            .get(&x.ident)
+            .expect("undeclared variable");
         self.instrs.push(tac::Instr {
             payload: tac::InstrPayload::LocalAddr(tac::InstrLocalAddr { dst, src }),
         });
@@ -399,12 +402,12 @@ pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
                 Func(x) => {
                     let mut gen = InstrGenerator::new();
                     for param in &x.params {
-                        gen.add_named_local(param.name.clone(), Bit::Bit32)?;
+                        gen.add_named_local(param.ident.clone(), Bit::Bit32)?;
                     }
                     gen.stmt_compound(x.body)?;
                     Ok(tac::Decl {
                         payload: tac::DeclPayload::Func(tac::DeclFunc {
-                            name: x.name,
+                            ident: x.ident,
                             args_count: x.params.len(),
                             locals: gen.locals,
                             instrs: gen.instrs,

@@ -7,7 +7,7 @@ pub enum Type {
 
 #[derive(Debug, Clone)]
 pub struct TypeInt {
-    pub loc: Loc,
+    pub int_loc: Loc,
 }
 
 #[derive(Debug, Clone)]
@@ -29,6 +29,7 @@ pub enum DeclPayload {
 #[derive(Debug, Clone)]
 pub struct DeclFunc {
     pub typ: Type,
+    pub name_loc: Loc,
     pub name: String,
     pub params: Vec<DeclParam>,
     pub body: StmtCompound,
@@ -38,6 +39,7 @@ pub struct DeclFunc {
 pub struct DeclParam {
     pub typ: Type,
     pub name: String,
+    pub name_loc: Loc,
 }
 
 #[derive(Debug, Clone)]
@@ -64,11 +66,13 @@ pub struct StmtExpr {
 
 #[derive(Debug, Clone)]
 pub struct StmtReturn {
+    pub return_loc: Loc,
     pub expr: Expr,
 }
 
 #[derive(Debug, Clone)]
 pub struct StmtCompound {
+    pub lbrace_loc: Loc,
     pub stmts: Vec<Stmt>,
 }
 
@@ -76,10 +80,12 @@ pub struct StmtCompound {
 pub struct StmtVarDecl {
     pub typ: Type,
     pub name: String,
+    pub name_loc: Loc,
 }
 
 #[derive(Debug, Clone)]
 pub struct StmtIf {
+    pub if_loc: Loc,
     pub cond: Expr,
     pub then: Box<Stmt>,
     pub else_: Option<Box<Stmt>>,
@@ -87,12 +93,14 @@ pub struct StmtIf {
 
 #[derive(Debug, Clone)]
 pub struct StmtWhile {
+    pub while_loc: Loc,
     pub cond: Expr,
     pub body: Box<Stmt>,
 }
 
 #[derive(Debug, Clone)]
 pub struct StmtFor {
+    pub for_loc: Loc,
     pub init: Option<Expr>,
     pub cond: Option<Expr>,
     pub step: Option<Expr>,
@@ -132,6 +140,7 @@ pub enum ExprLValue {
 #[derive(Debug, Clone)]
 pub struct ExprIntLit {
     pub value: i64,
+    pub value_loc: Loc,
 }
 
 #[derive(Debug, Clone)]
@@ -160,6 +169,7 @@ pub struct ExprDiv {
 
 #[derive(Debug, Clone)]
 pub struct ExprNeg {
+    pub minus_loc: Loc,
     pub expr: Box<Expr>,
 }
 
@@ -202,6 +212,7 @@ pub struct ExprGe {
 #[derive(Debug, Clone)]
 pub struct LValueVar {
     pub name: String,
+    pub name_loc: Loc,
 }
 
 #[derive(Debug, Clone)]
@@ -213,5 +224,6 @@ pub struct ExprAssign {
 #[derive(Debug, Clone)]
 pub struct ExprCall {
     pub name: String,
+    pub name_loc: Loc,
     pub args: Vec<Expr>,
 }

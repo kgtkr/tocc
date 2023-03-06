@@ -181,7 +181,10 @@ impl Parser {
             |p| p.satisfy(|token| match token.payload {
                 TokenPayload::IntLit(i) => Ok(Expr {
                     loc: token.loc.clone(),
-                    payload: ExprPayload::IntLit(ExprIntLit { value: i }),
+                    payload: ExprPayload::IntLit(ExprIntLit {
+                        value: i,
+                        value_loc: token.loc.clone()
+                    }),
                 }),
                 _ => Err(ParseErrorPayload::UnexpectedToken {
                     expected: "int literal".to_string(),
@@ -201,8 +204,8 @@ impl Parser {
             },
             |p| {
                 let token = p.peek().clone();
-                let ident = p.satisfy(|token| match &token.payload {
-                    TokenPayload::Ident(ident) => Ok(ident.clone()),
+                let (name, name_loc) = p.satisfy(|token| match &token.payload {
+                    TokenPayload::Ident(ident) => Ok((ident.clone(), token.loc.clone())),
                     _ => Err(ParseErrorPayload::UnexpectedToken {
                         expected: "identifier".to_string(),
                     }),
@@ -231,7 +234,8 @@ impl Parser {
                         Ok(Expr {
                             loc: token.loc.clone(),
                             payload: ExprPayload::Call(ExprCall {
-                                name: ident.clone(),
+                                name: name.clone(),
+                                name_loc: name_loc.clone(),
                                 args,
                             }),
                         })
@@ -240,7 +244,8 @@ impl Parser {
                         Ok(Expr {
                             loc: token.loc.clone(),
                             payload: ExprPayload::LValue(ExprLValue::Var(LValueVar {
-                                name: ident.clone(),
+                                name: name.clone(),
+                                name_loc: name_loc.clone(),
                             })),
                         })
                     },
@@ -258,11 +263,13 @@ impl Parser {
                 Ok(expr)
             },
             |p| {
-                p.satisfy_(|token| matches!(token.payload, TokenPayload::Minus), "-")?;
+                let minus =
+                    p.satisfy_(|token| matches!(token.payload, TokenPayload::Minus), "-")?;
                 let expr = p.primary()?;
                 Ok(Expr {
                     loc: expr.loc.clone(),
                     payload: ExprPayload::Neg(ExprNeg {
+                        minus_loc: minus.loc.clone(),
                         expr: Box::new(expr),
                     }),
                 })
@@ -518,7 +525,7 @@ impl Parser {
     }
 
     fn return_stmt(&mut self) -> Result<StmtReturn, ParseError> {
-        self.satisfy_(
+        let return_ = self.satisfy_(
             |token| matches!(token.payload, TokenPayload::Return),
             "return",
         )?;
@@ -527,11 +534,14 @@ impl Parser {
             |token| matches!(token.payload, TokenPayload::Semicolon),
             ";",
         )?;
-        Ok(StmtReturn { expr })
+        Ok(StmtReturn {
+            return_loc: return_.loc,
+            expr,
+        })
     }
 
     fn compound_stmt(&mut self) -> Result<StmtCompound, ParseError> {
-        self.satisfy_(
+        let lbrace = self.satisfy_(
             |token| matches!(token.payload, TokenPayload::BraceOpen),
             "{",
         )?;
@@ -541,13 +551,16 @@ impl Parser {
             "}",
         )?;
 
-        Ok(StmtCompound { stmts })
+        Ok(StmtCompound {
+            lbrace_loc: lbrace.loc,
+            stmts,
+        })
     }
 
     fn var_decl_stmt(&mut self) -> Result<StmtVarDecl, ParseError> {
         let typ = self.typ()?;
-        let name = self.satisfy(|token| match &token.payload {
-            TokenPayload::Ident(name) => Ok(name.clone()),
+        let (name, name_loc) = self.satisfy(|token| match &token.payload {
+            TokenPayload::Ident(name) => Ok((name.clone(), token.loc.clone())),
             _ => Err(ParseErrorPayload::UnexpectedToken {
                 expected: "identifier".to_string(),
             }),
@@ -556,11 +569,15 @@ impl Parser {
             |token| matches!(token.payload, TokenPayload::Semicolon),
             ";",
         )?;
-        Ok(StmtVarDecl { typ, name })
+        Ok(StmtVarDecl {
+            typ,
+            name,
+            name_loc,
+        })
     }
 
     fn if_stmt(&mut self) -> Result<StmtIf, ParseError> {
-        self.satisfy_(|token| matches!(token.payload, TokenPayload::If), "if")?;
+        let if_ = self.satisfy_(|token| matches!(token.payload, TokenPayload::If), "if")?;
         self.satisfy_(
             |token| matches!(token.payload, TokenPayload::ParenOpen),
             "(",
@@ -576,6 +593,7 @@ impl Parser {
             p.stat()
         })?;
         Ok(StmtIf {
+            if_loc: if_.loc,
             cond,
             then: Box::new(then),
             else_: else_.map(Box::new),
@@ -583,7 +601,7 @@ impl Parser {
     }
 
     fn while_stmt(&mut self) -> Result<StmtWhile, ParseError> {
-        self.satisfy_(
+        let while_ = self.satisfy_(
             |token| matches!(token.payload, TokenPayload::While),
             "while",
         )?;
@@ -598,13 +616,14 @@ impl Parser {
         )?;
         let body = self.stat()?;
         Ok(StmtWhile {
+            while_loc: while_.loc,
             cond,
             body: Box::new(body),
         })
     }
 
     fn for_stmt(&mut self) -> Result<StmtFor, ParseError> {
-        self.satisfy_(|token| matches!(token.payload, TokenPayload::For), "for")?;
+        let for_ = self.satisfy_(|token| matches!(token.payload, TokenPayload::For), "for")?;
         self.satisfy_(
             |token| matches!(token.payload, TokenPayload::ParenOpen),
             "(",
@@ -626,6 +645,7 @@ impl Parser {
         )?;
         let body = self.stat()?;
         Ok(StmtFor {
+            for_loc: for_.loc,
             init,
             cond,
             step,
@@ -645,8 +665,8 @@ impl Parser {
     fn func_decl(&mut self) -> Result<DeclFunc, ParseError> {
         let typ = self.typ()?;
 
-        let name = self.satisfy(|token| match &token.payload {
-            TokenPayload::Ident(name) => Ok(name.clone()),
+        let (name, name_loc) = self.satisfy(|token| match &token.payload {
+            TokenPayload::Ident(name) => Ok((name.clone(), token.loc.clone())),
             _ => Err(ParseErrorPayload::UnexpectedToken {
                 expected: "identifier".to_string(),
             }),
@@ -658,13 +678,17 @@ impl Parser {
         let params = self.sep_by(
             |p| {
                 let typ = p.typ()?;
-                let name = p.satisfy(|token| match &token.payload {
-                    TokenPayload::Ident(name) => Ok(name.clone()),
+                let (name, name_loc) = p.satisfy(|token| match &token.payload {
+                    TokenPayload::Ident(name) => Ok((name.clone(), token.loc.clone())),
                     _ => Err(ParseErrorPayload::UnexpectedToken {
                         expected: "identifier".to_string(),
                     }),
                 })?;
-                Ok(DeclParam { typ, name })
+                Ok(DeclParam {
+                    typ,
+                    name,
+                    name_loc,
+                })
             },
             |p| {
                 p.satisfy_(|token| matches!(token.payload, TokenPayload::Comma), ",")?;
@@ -678,6 +702,7 @@ impl Parser {
         let stmts = self.compound_stmt()?;
         Ok(DeclFunc {
             name,
+            name_loc,
             params,
             body: stmts,
             typ,
@@ -685,8 +710,8 @@ impl Parser {
     }
 
     fn typ(&mut self) -> Result<Type, ParseError> {
-        let token = self.satisfy_(|token| matches!(token.payload, TokenPayload::Int), "int")?;
-        Ok(Type::Int(TypeInt { loc: token.loc }))
+        let int = self.satisfy_(|token| matches!(token.payload, TokenPayload::Int), "int")?;
+        Ok(Type::Int(TypeInt { int_loc: int.loc }))
     }
 
     pub fn parse(&mut self) -> Result<Program, ParseError> {

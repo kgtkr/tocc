@@ -2,8 +2,8 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 use crate::clang::{
-    self, DeclPayload, Expr, ExprIntLit, ExprPayload, Program, Stmt, StmtCompound, StmtExpr,
-    StmtIf, StmtPayload, StmtReturn, StmtVarDecl,
+    self, Decl, Expr, ExprIntLit, Program, Stmt, StmtCompound, StmtExpr, StmtIf, StmtReturn,
+    StmtVarDecl,
 };
 use crate::{tac, Bit};
 use thiserror::Error;
@@ -58,8 +58,8 @@ impl InstrGenerator {
     }
 
     fn stmt(&mut self, stmt: Stmt) -> Result<(), CodegenError> {
-        use StmtPayload::*;
-        match stmt.payload {
+        use Stmt::*;
+        match stmt {
             Expr(x) => {
                 self.stmt_expr(x);
             }
@@ -81,9 +81,8 @@ impl InstrGenerator {
 
     fn stmt_return(&mut self, x: StmtReturn) {
         let src = self.expr(x.expr);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Return(tac::InstrReturn { src }),
-        });
+        self.instrs
+            .push(tac::Instr::Return(tac::InstrReturn { src }));
     }
 
     fn stmt_compound(&mut self, x: StmtCompound) -> Result<(), CodegenError> {
@@ -106,26 +105,21 @@ impl InstrGenerator {
 
         let cond = self.expr(x.cond.clone());
 
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::JumpIfNot(tac::InstrJumpIfNot {
-                cond,
-                label: else_label,
-            }),
-        });
+        self.instrs.push(tac::Instr::JumpIfNot(tac::InstrJumpIfNot {
+            cond,
+            label: else_label,
+        }));
 
         self.stmt(*x.then)?;
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Jump(tac::InstrJump { label: end_label }),
-        });
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Label(tac::InstrLabel { label: else_label }),
-        });
+        self.instrs
+            .push(tac::Instr::Jump(tac::InstrJump { label: end_label }));
+        self.instrs
+            .push(tac::Instr::Label(tac::InstrLabel { label: else_label }));
         if let Some(else_) = x.else_ {
             self.stmt(*else_)?;
         }
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Label(tac::InstrLabel { label: end_label }),
-        });
+        self.instrs
+            .push(tac::Instr::Label(tac::InstrLabel { label: end_label }));
         Ok(())
     }
 
@@ -133,23 +127,18 @@ impl InstrGenerator {
         let cond_label = self.generate_label();
         let end_label = self.generate_label();
 
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Label(tac::InstrLabel { label: cond_label }),
-        });
+        self.instrs
+            .push(tac::Instr::Label(tac::InstrLabel { label: cond_label }));
         let cond = self.expr(x.cond.clone());
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::JumpIfNot(tac::InstrJumpIfNot {
-                cond,
-                label: end_label,
-            }),
-        });
+        self.instrs.push(tac::Instr::JumpIfNot(tac::InstrJumpIfNot {
+            cond,
+            label: end_label,
+        }));
         self.stmt(*x.body)?;
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Jump(tac::InstrJump { label: cond_label }),
-        });
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Label(tac::InstrLabel { label: end_label }),
-        });
+        self.instrs
+            .push(tac::Instr::Jump(tac::InstrJump { label: cond_label }));
+        self.instrs
+            .push(tac::Instr::Label(tac::InstrLabel { label: end_label }));
         Ok(())
     }
 
@@ -160,34 +149,29 @@ impl InstrGenerator {
         if let Some(init) = x.init {
             self.expr(init);
         }
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Label(tac::InstrLabel { label: cond_label }),
-        });
+        self.instrs
+            .push(tac::Instr::Label(tac::InstrLabel { label: cond_label }));
         if let Some(cond) = x.cond {
             let cond = self.expr(cond);
-            self.instrs.push(tac::Instr {
-                payload: tac::InstrPayload::JumpIfNot(tac::InstrJumpIfNot {
-                    cond,
-                    label: end_label,
-                }),
-            });
+            self.instrs.push(tac::Instr::JumpIfNot(tac::InstrJumpIfNot {
+                cond,
+                label: end_label,
+            }));
         }
         self.stmt(*x.body.clone())?;
         if let Some(step) = x.step {
             self.expr(step);
         }
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Jump(tac::InstrJump { label: cond_label }),
-        });
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Label(tac::InstrLabel { label: end_label }),
-        });
+        self.instrs
+            .push(tac::Instr::Jump(tac::InstrJump { label: cond_label }));
+        self.instrs
+            .push(tac::Instr::Label(tac::InstrLabel { label: end_label }));
         Ok(())
     }
 
     fn expr(&mut self, expr: Expr) -> usize {
-        use ExprPayload::*;
-        match expr.payload {
+        use Expr::*;
+        match expr {
             IntLit(x) => self.expr_int_lit(x),
             Add(x) => self.expr_add(x),
             Sub(x) => self.expr_sub(x),
@@ -208,12 +192,10 @@ impl InstrGenerator {
 
     fn expr_int_lit(&mut self, x: ExprIntLit) -> usize {
         let dst = self.generate_local(Bit::Bit32);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::IntConst(tac::InstrIntConst {
-                dst,
-                value: x.value,
-            }),
-        });
+        self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
+            dst,
+            value: x.value,
+        }));
         dst
     }
 
@@ -221,9 +203,8 @@ impl InstrGenerator {
         let dst = self.generate_local(Bit::Bit32);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Add(tac::InstrAdd { dst, lhs, rhs }),
-        });
+        self.instrs
+            .push(tac::Instr::Add(tac::InstrAdd { dst, lhs, rhs }));
         dst
     }
 
@@ -231,9 +212,8 @@ impl InstrGenerator {
         let dst = self.generate_local(Bit::Bit32);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Sub(tac::InstrSub { dst, lhs, rhs }),
-        });
+        self.instrs
+            .push(tac::Instr::Sub(tac::InstrSub { dst, lhs, rhs }));
         dst
     }
 
@@ -241,9 +221,8 @@ impl InstrGenerator {
         let dst = self.generate_local(Bit::Bit32);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Mul(tac::InstrMul { dst, lhs, rhs }),
-        });
+        self.instrs
+            .push(tac::Instr::Mul(tac::InstrMul { dst, lhs, rhs }));
         dst
     }
 
@@ -251,18 +230,16 @@ impl InstrGenerator {
         let dst = self.generate_local(Bit::Bit32);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Div(tac::InstrDiv { dst, lhs, rhs }),
-        });
+        self.instrs
+            .push(tac::Instr::Div(tac::InstrDiv { dst, lhs, rhs }));
         dst
     }
 
     fn expr_neg(&mut self, x: clang::ExprNeg) -> usize {
         let dst = self.generate_local(Bit::Bit32);
         let src = self.expr(*x.expr);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Neg(tac::InstrNeg { dst, src }),
-        });
+        self.instrs
+            .push(tac::Instr::Neg(tac::InstrNeg { dst, src }));
         dst
     }
 
@@ -270,9 +247,8 @@ impl InstrGenerator {
         let dst = self.generate_local(Bit::Bit32);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Eq(tac::InstrEq { dst, lhs, rhs }),
-        });
+        self.instrs
+            .push(tac::Instr::Eq(tac::InstrEq { dst, lhs, rhs }));
         dst
     }
 
@@ -280,9 +256,8 @@ impl InstrGenerator {
         let dst = self.generate_local(Bit::Bit32);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Ne(tac::InstrNe { dst, lhs, rhs }),
-        });
+        self.instrs
+            .push(tac::Instr::Ne(tac::InstrNe { dst, lhs, rhs }));
         dst
     }
 
@@ -290,9 +265,8 @@ impl InstrGenerator {
         let dst = self.generate_local(Bit::Bit32);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Lt(tac::InstrLt { dst, lhs, rhs }),
-        });
+        self.instrs
+            .push(tac::Instr::Lt(tac::InstrLt { dst, lhs, rhs }));
         dst
     }
 
@@ -300,9 +274,8 @@ impl InstrGenerator {
         let dst = self.generate_local(Bit::Bit32);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Le(tac::InstrLe { dst, lhs, rhs }),
-        });
+        self.instrs
+            .push(tac::Instr::Le(tac::InstrLe { dst, lhs, rhs }));
         dst
     }
 
@@ -310,13 +283,11 @@ impl InstrGenerator {
         let dst = self.generate_local(Bit::Bit32);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Lt(tac::InstrLt {
-                dst,
-                lhs: rhs,
-                rhs: lhs,
-            }),
-        });
+        self.instrs.push(tac::Instr::Lt(tac::InstrLt {
+            dst,
+            lhs: rhs,
+            rhs: lhs,
+        }));
         dst
     }
 
@@ -324,34 +295,33 @@ impl InstrGenerator {
         let dst = self.generate_local(Bit::Bit32);
         let lhs = self.expr(*x.lhs);
         let rhs = self.expr(*x.rhs);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Le(tac::InstrLe {
-                dst,
-                lhs: rhs,
-                rhs: lhs,
-            }),
-        });
+        self.instrs.push(tac::Instr::Le(tac::InstrLe {
+            dst,
+            lhs: rhs,
+            rhs: lhs,
+        }));
         dst
     }
 
     fn expr_assign(&mut self, x: clang::ExprAssign) -> usize {
-        let clang::ExprPayload::LValue(lvalue) = x.lhs.payload else {
+        let clang::Expr::LValue(lvalue) = *x.lhs else {
             panic!("expected lvalue");
         };
         let dst = self.lvalue(lvalue);
         let src = self.expr(*x.rhs);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::AssignIndirect(tac::InstrAssignIndirect { dst, src }),
-        });
+        self.instrs
+            .push(tac::Instr::AssignIndirect(tac::InstrAssignIndirect {
+                dst,
+                src,
+            }));
         src
     }
 
     fn expr_lvalue(&mut self, x: clang::ExprLValue) -> usize {
         let dst = self.generate_local(Bit::Bit32);
         let src = self.lvalue(x);
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Deref(tac::InstrDeref { dst, src }),
-        });
+        self.instrs
+            .push(tac::Instr::Deref(tac::InstrDeref { dst, src }));
         dst
     }
 
@@ -362,13 +332,11 @@ impl InstrGenerator {
             .into_iter()
             .map(|arg| self.expr(arg))
             .collect::<Vec<_>>();
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::Call(tac::InstrCall {
-                dst,
-                ident: x.ident,
-                args,
-            }),
-        });
+        self.instrs.push(tac::Instr::Call(tac::InstrCall {
+            dst,
+            ident: x.ident,
+            args,
+        }));
         dst
     }
 
@@ -385,9 +353,8 @@ impl InstrGenerator {
             .local_idents
             .get(&x.ident)
             .expect("undeclared variable");
-        self.instrs.push(tac::Instr {
-            payload: tac::InstrPayload::LocalAddr(tac::InstrLocalAddr { dst, src }),
-        });
+        self.instrs
+            .push(tac::Instr::LocalAddr(tac::InstrLocalAddr { dst, src }));
         dst
     }
 }
@@ -397,22 +364,20 @@ pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
         .decls
         .into_iter()
         .map(|decl| {
-            use DeclPayload::*;
-            match decl.payload {
+            use Decl::*;
+            match decl {
                 Func(x) => {
                     let mut gen = InstrGenerator::new();
                     for param in &x.params {
                         gen.add_named_local(param.ident.clone(), Bit::Bit32)?;
                     }
                     gen.stmt_compound(x.body)?;
-                    Ok(tac::Decl {
-                        payload: tac::DeclPayload::Func(tac::DeclFunc {
-                            ident: x.ident,
-                            args_count: x.params.len(),
-                            locals: gen.locals,
-                            instrs: gen.instrs,
-                        }),
-                    })
+                    Ok(tac::Decl::Func(tac::DeclFunc {
+                        ident: x.ident,
+                        args_count: x.params.len(),
+                        locals: gen.locals,
+                        instrs: gen.instrs,
+                    }))
                 }
             }
         })

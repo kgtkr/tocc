@@ -16,13 +16,7 @@ pub struct Program {
 }
 
 #[derive(Debug, Clone)]
-pub struct Decl {
-    pub loc: Loc,
-    pub payload: DeclPayload,
-}
-
-#[derive(Debug, Clone)]
-pub enum DeclPayload {
+pub enum Decl {
     Func(DeclFunc),
 }
 
@@ -43,13 +37,7 @@ pub struct DeclParam {
 }
 
 #[derive(Debug, Clone)]
-pub struct Stmt {
-    pub loc: Loc,
-    pub payload: StmtPayload,
-}
-
-#[derive(Debug, Clone)]
-pub enum StmtPayload {
+pub enum Stmt {
     Expr(StmtExpr),
     Return(StmtReturn),
     Compound(StmtCompound),
@@ -108,13 +96,7 @@ pub struct StmtFor {
 }
 
 #[derive(Debug, Clone)]
-pub struct Expr {
-    pub loc: Loc,
-    pub payload: ExprPayload,
-}
-
-#[derive(Debug, Clone)]
-pub enum ExprPayload {
+pub enum Expr {
     IntLit(ExprIntLit),
     Add(ExprAdd),
     Sub(ExprSub),

@@ -1,8 +1,8 @@
 use crate::clang::{
-    Decl, DeclFunc, DeclParam, DeclPayload, Expr, ExprAdd, ExprAssign, ExprCall, ExprDiv, ExprEq,
-    ExprGe, ExprGt, ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload,
-    ExprSub, LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf, StmtPayload,
-    StmtReturn, StmtVarDecl, StmtWhile, Type, TypeInt,
+    Decl, DeclFunc, DeclParam, Expr, ExprAdd, ExprAssign, ExprCall, ExprDiv, ExprEq, ExprGe,
+    ExprGt, ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprSub, LValueVar,
+    Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf, StmtReturn, StmtVarDecl, StmtWhile,
+    Type, TypeInt,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -179,13 +179,10 @@ impl Parser {
         parser_or!(
             self,
             |p| p.satisfy(|token| match token.payload {
-                TokenPayload::IntLit(i) => Ok(Expr {
-                    loc: token.loc.clone(),
-                    payload: ExprPayload::IntLit(ExprIntLit {
-                        value: i,
-                        value_loc: token.loc.clone()
-                    }),
-                }),
+                TokenPayload::IntLit(i) => Ok(Expr::IntLit(ExprIntLit {
+                    value: i,
+                    value_loc: token.loc.clone()
+                })),
                 _ => Err(ParseErrorPayload::UnexpectedToken {
                     expected: "int literal".to_string(),
                 }),
@@ -231,23 +228,17 @@ impl Parser {
                             |token| matches!(token.payload, TokenPayload::ParenClose),
                             ")",
                         )?;
-                        Ok(Expr {
-                            loc: token.loc.clone(),
-                            payload: ExprPayload::Call(ExprCall {
-                                ident: ident.clone(),
-                                ident_loc: ident_loc.clone(),
-                                args,
-                            }),
-                        })
+                        Ok(Expr::Call(ExprCall {
+                            ident: ident.clone(),
+                            ident_loc: ident_loc.clone(),
+                            args,
+                        }))
                     },
                     |_| {
-                        Ok(Expr {
-                            loc: token.loc.clone(),
-                            payload: ExprPayload::LValue(ExprLValue::Var(LValueVar {
-                                ident: ident.clone(),
-                                ident_loc: ident_loc.clone(),
-                            })),
-                        })
+                        Ok(Expr::LValue(ExprLValue::Var(LValueVar {
+                            ident: ident.clone(),
+                            ident_loc: ident_loc.clone(),
+                        })))
                     },
                 )
             },
@@ -266,13 +257,10 @@ impl Parser {
                 let minus =
                     p.satisfy_(|token| matches!(token.payload, TokenPayload::Minus), "-")?;
                 let expr = p.primary()?;
-                Ok(Expr {
-                    loc: expr.loc.clone(),
-                    payload: ExprPayload::Neg(ExprNeg {
-                        minus_loc: minus.loc,
-                        expr: Box::new(expr),
-                    }),
-                })
+                Ok(Expr::Neg(ExprNeg {
+                    minus_loc: minus.loc,
+                    expr: Box::new(expr),
+                }))
             },
             |p| p.primary(),
         )
@@ -302,20 +290,14 @@ impl Parser {
             },
             expr,
             |expr, (op, rhs)| match op {
-                Op::Mul => Expr {
-                    loc: expr.loc.clone(),
-                    payload: ExprPayload::Mul(ExprMul {
-                        lhs: Box::new(expr),
-                        rhs: Box::new(rhs),
-                    }),
-                },
-                Op::Div => Expr {
-                    loc: expr.loc.clone(),
-                    payload: ExprPayload::Div(ExprDiv {
-                        lhs: Box::new(expr),
-                        rhs: Box::new(rhs),
-                    }),
-                },
+                Op::Mul => Expr::Mul(ExprMul {
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                }),
+                Op::Div => Expr::Div(ExprDiv {
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                }),
             },
         )
     }
@@ -344,20 +326,14 @@ impl Parser {
             },
             expr,
             |expr, (op, rhs)| match op {
-                Op::Add => Expr {
-                    loc: expr.loc.clone(),
-                    payload: ExprPayload::Add(ExprAdd {
-                        lhs: Box::new(expr),
-                        rhs: Box::new(rhs),
-                    }),
-                },
-                Op::Sub => Expr {
-                    loc: expr.loc.clone(),
-                    payload: ExprPayload::Sub(ExprSub {
-                        lhs: Box::new(expr),
-                        rhs: Box::new(rhs),
-                    }),
-                },
+                Op::Add => Expr::Add(ExprAdd {
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                }),
+                Op::Sub => Expr::Sub(ExprSub {
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                }),
             },
         )
     }
@@ -398,34 +374,22 @@ impl Parser {
             },
             expr,
             |expr, (op, rhs)| match op {
-                Op::Lt => Expr {
-                    loc: expr.loc.clone(),
-                    payload: ExprPayload::Lt(ExprLt {
-                        lhs: Box::new(expr),
-                        rhs: Box::new(rhs),
-                    }),
-                },
-                Op::Le => Expr {
-                    loc: expr.loc.clone(),
-                    payload: ExprPayload::Le(ExprLe {
-                        lhs: Box::new(expr),
-                        rhs: Box::new(rhs),
-                    }),
-                },
-                Op::Gt => Expr {
-                    loc: expr.loc.clone(),
-                    payload: ExprPayload::Gt(ExprGt {
-                        lhs: Box::new(expr),
-                        rhs: Box::new(rhs),
-                    }),
-                },
-                Op::Ge => Expr {
-                    loc: expr.loc.clone(),
-                    payload: ExprPayload::Ge(ExprGe {
-                        lhs: Box::new(expr),
-                        rhs: Box::new(rhs),
-                    }),
-                },
+                Op::Lt => Expr::Lt(ExprLt {
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                }),
+                Op::Le => Expr::Le(ExprLe {
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                }),
+                Op::Gt => Expr::Gt(ExprGt {
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                }),
+                Op::Ge => Expr::Ge(ExprGe {
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                }),
             },
         )
     }
@@ -454,20 +418,14 @@ impl Parser {
             },
             expr,
             |expr, (op, rhs)| match op {
-                Op::Eq => Expr {
-                    loc: expr.loc.clone(),
-                    payload: ExprPayload::Eq(ExprEq {
-                        lhs: Box::new(expr),
-                        rhs: Box::new(rhs),
-                    }),
-                },
-                Op::Ne => Expr {
-                    loc: expr.loc.clone(),
-                    payload: ExprPayload::Ne(ExprNe {
-                        lhs: Box::new(expr),
-                        rhs: Box::new(rhs),
-                    }),
-                },
+                Op::Eq => Expr::Eq(ExprEq {
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                }),
+                Op::Ne => Expr::Ne(ExprNe {
+                    lhs: Box::new(expr),
+                    rhs: Box::new(rhs),
+                }),
             },
         )
     }
@@ -479,13 +437,10 @@ impl Parser {
             |p| {
                 p.satisfy_(|token| matches!(token.payload, TokenPayload::Eq), "=")?;
                 let rhs = p.assign()?;
-                Ok(Expr {
-                    loc: expr.loc.clone(),
-                    payload: ExprPayload::Assign(ExprAssign {
-                        lhs: Box::new(expr.clone()),
-                        rhs: Box::new(rhs),
-                    }),
-                })
+                Ok(Expr::Assign(ExprAssign {
+                    lhs: Box::new(expr.clone()),
+                    rhs: Box::new(rhs),
+                }))
             },
             |_| Ok(expr.clone()),
         )
@@ -498,21 +453,16 @@ impl Parser {
 
     fn stat(&mut self) -> Result<Stmt, ParseError> {
         let token = self.peek().clone();
-        let payload = parser_or!(
+        parser_or!(
             self,
-            |p| p.return_stmt().map(StmtPayload::Return),
-            |p| p.compound_stmt().map(StmtPayload::Compound),
-            |p| p.expr_stmt().map(StmtPayload::Expr),
-            |p| p.var_decl_stmt().map(StmtPayload::VarDecl),
-            |p| p.if_stmt().map(StmtPayload::If),
-            |p| p.while_stmt().map(StmtPayload::While),
-            |p| p.for_stmt().map(StmtPayload::For),
-        )?;
-
-        Ok(Stmt {
-            loc: token.loc,
-            payload,
-        })
+            |p| p.return_stmt().map(Stmt::Return),
+            |p| p.compound_stmt().map(Stmt::Compound),
+            |p| p.expr_stmt().map(Stmt::Expr),
+            |p| p.var_decl_stmt().map(Stmt::VarDecl),
+            |p| p.if_stmt().map(Stmt::If),
+            |p| p.while_stmt().map(Stmt::While),
+            |p| p.for_stmt().map(Stmt::For),
+        )
     }
 
     fn expr_stmt(&mut self) -> Result<StmtExpr, ParseError> {
@@ -655,11 +605,7 @@ impl Parser {
 
     fn decl(&mut self) -> Result<Decl, ParseError> {
         let token = self.peek().clone();
-        let payload = DeclPayload::Func(self.func_decl()?);
-        Ok(Decl {
-            loc: token.loc,
-            payload,
-        })
+        self.func_decl().map(Decl::Func)
     }
 
     fn func_decl(&mut self) -> Result<DeclFunc, ParseError> {

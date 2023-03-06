@@ -1,5 +1,5 @@
 use crate::buf::Buf;
-use crate::tac::{self, Decl, DeclFunc, DeclPayload, Instr, InstrPayload, InstrReturn, Program};
+use crate::tac::{self, Decl, DeclFunc, Instr, InstrReturn, Program};
 use crate::Bit;
 
 #[derive(Debug, Copy, Clone)]
@@ -148,8 +148,8 @@ impl Generator {
     }
 
     fn decl(&mut self, decl: Decl) {
-        use DeclPayload::*;
-        match decl.payload {
+        use Decl::*;
+        match decl {
             Func(x) => {
                 self.decl_func(x);
             }
@@ -254,8 +254,8 @@ impl FuncGenerator {
     }
 
     fn instr(&mut self, instr: Instr) {
-        use InstrPayload::*;
-        match instr.payload {
+        use Instr::*;
+        match instr {
             Return(x) => self.instr_return(x),
             IntConst(x) => self.instr_int_const(x),
             Add(x) => self.instr_add(x),

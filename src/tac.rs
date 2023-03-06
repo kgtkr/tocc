@@ -11,12 +11,7 @@ pub struct Program {
 }
 
 #[derive(Debug, Clone)]
-pub struct Decl {
-    pub payload: DeclPayload,
-}
-
-#[derive(Debug, Clone)]
-pub enum DeclPayload {
+pub enum Decl {
     Func(DeclFunc),
 }
 
@@ -30,12 +25,7 @@ pub struct DeclFunc {
 }
 
 #[derive(Debug, Clone)]
-pub struct Instr {
-    pub payload: InstrPayload,
-}
-
-#[derive(Debug, Clone)]
-pub enum InstrPayload {
+pub enum Instr {
     Return(InstrReturn),
     IntConst(InstrIntConst),
     Add(InstrAdd),

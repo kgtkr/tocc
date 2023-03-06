@@ -2,7 +2,7 @@ use crate::clang::{
     Decl, DeclFunc, DeclParam, DeclPayload, Expr, ExprAdd, ExprAssign, ExprCall, ExprDiv, ExprEq,
     ExprGe, ExprGt, ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprPayload,
     ExprSub, LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf, StmtPayload,
-    StmtReturn, StmtVarDecl, StmtWhile, Type,
+    StmtReturn, StmtVarDecl, StmtWhile, Type, TypeInt,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -67,10 +67,10 @@ impl Parser {
         &mut self,
         f: impl FnOnce(&Token) -> bool,
         expected: impl ToString,
-    ) -> Result<(), ParseError> {
+    ) -> Result<Token, ParseError> {
         self.satisfy(|token| {
             if f(token) {
-                Ok(())
+                Ok(token.clone())
             } else {
                 Err(ParseErrorPayload::UnexpectedToken {
                     expected: expected.to_string(),
@@ -220,7 +220,8 @@ impl Parser {
                                 p.satisfy_(
                                     |token| matches!(token.payload, TokenPayload::Comma),
                                     ",",
-                                )
+                                )?;
+                                Ok(())
                             },
                         )?;
                         p.satisfy_(
@@ -665,7 +666,10 @@ impl Parser {
                 })?;
                 Ok(DeclParam { typ, name })
             },
-            |p| p.satisfy_(|token| matches!(token.payload, TokenPayload::Comma), ","),
+            |p| {
+                p.satisfy_(|token| matches!(token.payload, TokenPayload::Comma), ",")?;
+                Ok(())
+            },
         )?;
         self.satisfy_(
             |token| matches!(token.payload, TokenPayload::ParenClose),
@@ -681,8 +685,8 @@ impl Parser {
     }
 
     fn typ(&mut self) -> Result<Type, ParseError> {
-        self.satisfy_(|token| matches!(token.payload, TokenPayload::Int), "int")?;
-        Ok(Type::Int)
+        let token = self.satisfy_(|token| matches!(token.payload, TokenPayload::Int), "int")?;
+        Ok(Type::Int(TypeInt { loc: token.loc }))
     }
 
     pub fn parse(&mut self) -> Result<Program, ParseError> {

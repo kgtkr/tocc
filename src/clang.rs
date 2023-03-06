@@ -2,7 +2,12 @@ use crate::loc::Loc;
 
 #[derive(Debug, Clone)]
 pub enum Type {
-    Int,
+    Int(TypeInt),
+}
+
+#[derive(Debug, Clone)]
+pub struct TypeInt {
+    pub loc: Loc,
 }
 
 #[derive(Debug, Clone)]

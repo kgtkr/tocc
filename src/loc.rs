@@ -12,3 +12,7 @@ impl fmt::Display for Loc {
         write!(f, "{}:{}:{}", self.filename, self.line, self.col)
     }
 }
+
+pub trait Locatable {
+    fn loc(&self) -> &Loc;
+}

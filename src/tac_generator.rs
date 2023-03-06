@@ -5,13 +5,14 @@ use crate::clang::{
     self, Decl, Expr, ExprIntLit, Program, Stmt, StmtCompound, StmtExpr, StmtIf, StmtReturn,
     StmtVarDecl,
 };
+use crate::loc::Loc;
 use crate::{tac, Bit};
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
-#[error("{message}")]
+#[error("{loc}: {message}")]
 pub struct CodegenError {
-    // loc: Loc,
+    loc: Loc,
     message: String,
 }
 
@@ -33,13 +34,19 @@ impl InstrGenerator {
         }
     }
 
-    fn add_named_local(&mut self, ident: String, bit: Bit) -> Result<usize, CodegenError> {
+    fn add_named_local(
+        &mut self,
+        ident: String,
+        ident_loc: &Loc,
+        bit: Bit,
+    ) -> Result<usize, CodegenError> {
         let local = self.generate_local(bit);
         if let Entry::Vacant(entry) = self.local_idents.entry(ident.clone()) {
             entry.insert(local);
             Ok(local)
         } else {
             Err(CodegenError {
+                loc: ident_loc.clone(),
                 message: format!("local variable {} is already defined", ident),
             })
         }
@@ -95,7 +102,7 @@ impl InstrGenerator {
     }
 
     fn stmt_var_decl(&mut self, x: StmtVarDecl) -> Result<(), CodegenError> {
-        self.add_named_local(x.ident, Bit::Bit32)?;
+        self.add_named_local(x.ident, &x.ident_loc, Bit::Bit32)?;
         Ok(())
     }
 
@@ -369,7 +376,7 @@ pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
                 Func(x) => {
                     let mut gen = InstrGenerator::new();
                     for param in &x.params {
-                        gen.add_named_local(param.ident.clone(), Bit::Bit32)?;
+                        gen.add_named_local(param.ident.clone(), &param.ident_loc, Bit::Bit32)?;
                     }
                     gen.stmt_compound(x.body)?;
                     Ok(tac::Decl::Func(tac::DeclFunc {

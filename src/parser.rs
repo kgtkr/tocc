@@ -2,7 +2,7 @@ use crate::clang::{
     Decl, DeclFunc, DeclParam, Expr, ExprAdd, ExprAssign, ExprCall, ExprDiv, ExprEq, ExprGe,
     ExprGt, ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprSub, LValueVar,
     Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf, StmtReturn, StmtVarDecl, StmtWhile,
-    Type, TypeInt,
+    Type, TypeInt, TypePtr,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -655,9 +655,23 @@ impl Parser {
         })
     }
 
-    fn typ(&mut self) -> Result<Type, ParseError> {
+    fn typ_primary(&mut self) -> Result<Type, ParseError> {
         let int = self.satisfy_(|token| matches!(token.payload, TokenPayload::Int), "int")?;
+
         Ok(Type::Int(TypeInt { int_loc: int.loc }))
+    }
+
+    fn typ_suffix_unary(&mut self) -> Result<Type, ParseError> {
+        let typ = self.typ_primary()?;
+        self.fold(
+            |p| p.satisfy_(|token| matches!(token.payload, TokenPayload::Asterisk), "*"),
+            typ,
+            |typ, _| Type::Ptr(TypePtr { typ: Box::new(typ) }),
+        )
+    }
+
+    fn typ(&mut self) -> Result<Type, ParseError> {
+        self.typ_suffix_unary()
     }
 
     pub fn parse(&mut self) -> Result<Program, ParseError> {

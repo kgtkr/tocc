@@ -3,12 +3,14 @@ use crate::loc::{Loc, Locatable};
 #[derive(Debug, Clone)]
 pub enum Type {
     Int(TypeInt),
+    Ptr(TypePtr),
 }
 
 impl Locatable for Type {
     fn loc(&self) -> &Loc {
         match self {
             Type::Int(x) => x.loc(),
+            Type::Ptr(x) => x.loc(),
         }
     }
 }
@@ -21,6 +23,17 @@ pub struct TypeInt {
 impl Locatable for TypeInt {
     fn loc(&self) -> &Loc {
         &self.int_loc
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TypePtr {
+    pub typ: Box<Type>,
+}
+
+impl Locatable for TypePtr {
+    fn loc(&self) -> &Loc {
+        self.typ.loc()
     }
 }
 

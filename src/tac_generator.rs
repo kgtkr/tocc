@@ -102,7 +102,11 @@ impl InstrGenerator {
     }
 
     fn stmt_var_decl(&mut self, x: StmtVarDecl) -> Result<(), CodegenError> {
-        self.add_named_local(x.ident, &x.ident_loc, Bit::Bit32)?;
+        let bit = match x.typ {
+            clang::Type::Int(_) => Bit::Bit32,
+            clang::Type::Ptr(_) => Bit::Bit64,
+        };
+        self.add_named_local(x.ident, &x.ident_loc, bit)?;
         Ok(())
     }
 
@@ -326,7 +330,7 @@ impl InstrGenerator {
     }
 
     fn expr_lvalue(&mut self, x: clang::ExprLValue) -> usize {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(Bit::Bit32); // TODO:
         let src = self.lvalue(x);
         self.instrs
             .push(tac::Instr::Deref(tac::InstrDeref { dst, src }));

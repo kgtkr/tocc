@@ -127,6 +127,16 @@ impl Register {
     }
 }
 
+fn bit_to_word(bit: Bit) -> &'static str {
+    use Bit::*;
+    match bit {
+        Bit8 => "BYTE",
+        Bit16 => "WORD",
+        Bit32 => "DWORD",
+        Bit64 => "QWORD",
+    }
+}
+
 #[derive(Debug)]
 struct Generator {
     buf: Buf,
@@ -372,9 +382,13 @@ impl FuncGenerator {
     }
 
     fn instr_assign_indirect(&mut self, x: tac::InstrAssignIndirect) {
+        let src_bit = self.locals[x.src].bit;
+        let di = Register::Rdi.for_bit(src_bit);
+        let src_word = bit_to_word(src_bit);
         self.buf.append(format!("mov rax, {}\n", self.local(x.dst)));
-        self.buf.append(format!("mov edi, {}\n", self.local(x.src)));
-        self.buf.append("mov DWORD PTR [rax], edi\n");
+        self.buf
+            .append(format!("mov {di}, {}\n", self.local(x.src)));
+        self.buf.append(format!("mov {src_word} PTR [rax], {di}\n"));
     }
 
     fn instr_label(&mut self, x: tac::InstrLabel) {

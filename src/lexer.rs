@@ -137,6 +137,7 @@ impl Lexer {
                     Some(TokenPayload::Gt)
                 }
             }
+            '&' => Some(TokenPayload::Amp),
             ',' => Some(TokenPayload::Comma),
             ' ' | '\t' | '\r' | '\n' => None,
             _ => return Err(LexerError::InvalidCharacter { loc: begin_loc, c }),

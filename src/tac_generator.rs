@@ -194,6 +194,7 @@ impl InstrGenerator {
             LValue(x) => self.expr_lvalue(x),
             Assign(x) => self.expr_assign(x),
             Call(x) => self.expr_call(x),
+            Addr(x) => self.expr_addr(x),
         }
     }
 
@@ -347,10 +348,19 @@ impl InstrGenerator {
         dst
     }
 
+    fn expr_addr(&mut self, x: clang::ExprAddr) -> usize {
+        let clang::Expr::LValue(lvalue) = *x.expr else {
+            panic!("expected lvalue");
+        };
+        let dst = self.lvalue(lvalue);
+        dst
+    }
+
     fn lvalue(&mut self, x: clang::ExprLValue) -> usize {
         use clang::ExprLValue::*;
         match x {
             Var(x) => self.lvalue_var(x),
+            Deref(x) => self.lvalue_deref(x),
         }
     }
 
@@ -362,6 +372,11 @@ impl InstrGenerator {
             .expect("undeclared variable");
         self.instrs
             .push(tac::Instr::LocalAddr(tac::InstrLocalAddr { dst, src }));
+        dst
+    }
+
+    fn lvalue_deref(&mut self, x: clang::LValueDeref) -> usize {
+        let dst = self.expr(*x.expr);
         dst
     }
 }

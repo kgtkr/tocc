@@ -1,8 +1,8 @@
 use crate::clang::{
-    Decl, DeclFunc, DeclParam, Expr, ExprAdd, ExprAssign, ExprCall, ExprDiv, ExprEq, ExprGe,
-    ExprGt, ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprSub, LValueVar,
-    Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf, StmtReturn, StmtVarDecl, StmtWhile,
-    Type, TypeInt, TypePtr,
+    Decl, DeclFunc, DeclParam, Expr, ExprAdd, ExprAddr, ExprAssign, ExprCall, ExprDeref, ExprDiv,
+    ExprEq, ExprGe, ExprGt, ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg,
+    ExprSub, LValueDeref, LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf,
+    StmtReturn, StmtVarDecl, StmtWhile, Type, TypeInt, TypePtr,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -261,6 +261,23 @@ impl Parser {
                     minus_loc: minus.loc,
                     expr: Box::new(expr),
                 }))
+            },
+            |p| {
+                let amp = p.satisfy_(|token| matches!(token.payload, TokenPayload::Amp), "&")?;
+                let expr = p.primary()?;
+                Ok(Expr::Addr(ExprAddr {
+                    amp_loc: amp.loc,
+                    expr: Box::new(expr),
+                }))
+            },
+            |p| {
+                let star =
+                    p.satisfy_(|token| matches!(token.payload, TokenPayload::Asterisk), "*")?;
+                let expr = p.primary()?;
+                Ok(Expr::LValue(ExprLValue::Deref(LValueDeref {
+                    star_loc: star.loc,
+                    expr: Box::new(expr),
+                })))
             },
             |p| p.primary(),
         )

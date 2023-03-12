@@ -215,6 +215,7 @@ pub enum Expr {
     LValue(ExprLValue),
     Assign(ExprAssign),
     Call(ExprCall),
+    Addr(ExprAddr),
 }
 
 impl Locatable for Expr {
@@ -235,6 +236,7 @@ impl Locatable for Expr {
             Expr::LValue(x) => x.loc(),
             Expr::Assign(x) => x.loc(),
             Expr::Call(x) => x.loc(),
+            Expr::Addr(x) => x.loc(),
         }
     }
 }
@@ -242,12 +244,14 @@ impl Locatable for Expr {
 #[derive(Debug, Clone)]
 pub enum ExprLValue {
     Var(LValueVar),
+    Deref(LValueDeref),
 }
 
 impl Locatable for ExprLValue {
     fn loc(&self) -> &Loc {
         match self {
             ExprLValue::Var(x) => x.loc(),
+            ExprLValue::Deref(x) => x.loc(),
         }
     }
 }
@@ -409,6 +413,18 @@ impl Locatable for LValueVar {
 }
 
 #[derive(Debug, Clone)]
+pub struct LValueDeref {
+    pub star_loc: Loc,
+    pub expr: Box<Expr>,
+}
+
+impl Locatable for LValueDeref {
+    fn loc(&self) -> &Loc {
+        &self.star_loc
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ExprAssign {
     pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
@@ -430,5 +446,29 @@ pub struct ExprCall {
 impl Locatable for ExprCall {
     fn loc(&self) -> &Loc {
         &self.ident_loc
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprAddr {
+    pub amp_loc: Loc,
+    pub expr: Box<Expr>,
+}
+
+impl Locatable for ExprAddr {
+    fn loc(&self) -> &Loc {
+        &self.amp_loc
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprDeref {
+    pub star_loc: Loc,
+    pub expr: Box<Expr>,
+}
+
+impl Locatable for ExprDeref {
+    fn loc(&self) -> &Loc {
+        &self.star_loc
     }
 }

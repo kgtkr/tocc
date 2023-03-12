@@ -38,4 +38,5 @@ pub enum TokenPayload {
     While,
     For,
     Comma,
+    Amp,
 }

@@ -1,5 +1,3 @@
-use std::ops::AddAssign;
-
 use crate::buf::Buf;
 use crate::tac::{self, Decl, DeclFunc, Instr, InstrReturn, Program};
 use crate::Bit;
@@ -150,13 +148,12 @@ impl Generator {
     }
 
     fn program(&mut self, program: Program) {
-        self.buf.add_assign(".intel_syntax noprefix\n");
-        self.buf.add_assign(".globl main\n");
+        self.buf += ".intel_syntax noprefix\n";
+        self.buf += ".globl main\n";
         for decl in program.decls {
             self.decl(decl);
         }
-        self.buf
-            .add_assign(".section .note.GNU-stack, \"\", @progbits\n");
+        self.buf += ".section .note.GNU-stack, \"\", @progbits\n";
     }
 
     fn decl(&mut self, decl: Decl) {
@@ -169,7 +166,7 @@ impl Generator {
     }
 
     fn decl_func(&mut self, x: DeclFunc) {
-        self.buf.add_assign(FuncGenerator::gen(x));
+        self.buf += FuncGenerator::gen(x);
     }
 }
 
@@ -210,41 +207,38 @@ impl FuncGenerator {
             .map(|local| local.bit.to_size())
             .sum::<usize>();
 
-        self.buf.add_assign(format!("{}:\n", func.ident));
-        self.buf.add_assign("push rbp\n");
-        self.buf.add_assign("mov rbp, rsp\n");
+        self.buf += format!("{}:\n", func.ident);
+        self.buf += "push rbp\n";
+        self.buf += "mov rbp, rsp\n";
         let stack_size = locals_size + 8 /* rbpの分 */;
         let locals_pad = if stack_size % 16 == 0 {
             0
         } else {
             16 - stack_size % 16
         };
-        self.buf
-            .add_assign(format!("sub rsp, {}\n", locals_size + locals_pad));
+        self.buf += format!("sub rsp, {}\n", locals_size + locals_pad);
         if func.args_count >= 1 {
-            self.buf.add_assign(format!("mov {}, edi\n", self.local(0)));
+            self.buf += format!("mov {}, edi\n", self.local(0));
         }
         if func.args_count >= 2 {
-            self.buf.add_assign(format!("mov {}, esi\n", self.local(1)));
+            self.buf += format!("mov {}, esi\n", self.local(1));
         }
         if func.args_count >= 3 {
-            self.buf.add_assign(format!("mov {}, edx\n", self.local(2)));
+            self.buf += format!("mov {}, edx\n", self.local(2));
         }
         if func.args_count >= 4 {
-            self.buf.add_assign(format!("mov {}, ecx\n", self.local(3)));
+            self.buf += format!("mov {}, ecx\n", self.local(3));
         }
         if func.args_count >= 5 {
-            self.buf.add_assign(format!("mov {}, r8d\n", self.local(4)));
+            self.buf += format!("mov {}, r8d\n", self.local(4));
         }
         if func.args_count >= 6 {
-            self.buf.add_assign(format!("mov {}, r9d\n", self.local(5)));
+            self.buf += format!("mov {}, r9d\n", self.local(5));
         }
         if func.args_count >= 7 {
             for i in 0..(func.args_count - 6) {
-                self.buf
-                    .add_assign(format!("mov eax, DWORD PTR [rbp+{}]\n", 4 * i + 16));
-                self.buf
-                    .add_assign(format!("mov {}, eax\n", self.local(6 + i),));
+                self.buf += format!("mov eax, DWORD PTR [rbp+{}]\n", 4 * i + 16);
+                self.buf += format!("mov {}, eax\n", self.local(6 + i),);
             }
         }
         for instr in func.instrs {
@@ -291,196 +285,149 @@ impl FuncGenerator {
     }
 
     fn instr_return(&mut self, x: InstrReturn) {
-        self.buf
-            .add_assign(format!("mov eax, {}\n", self.local(x.src)));
-        self.buf.add_assign("leave\n");
-        self.buf.add_assign("ret\n");
+        self.buf += format!("mov eax, {}\n", self.local(x.src));
+        self.buf += "leave\n";
+        self.buf += "ret\n";
     }
 
     fn instr_int_const(&mut self, x: tac::InstrIntConst) {
-        self.buf
-            .add_assign(format!("mov {}, {}\n", self.local(x.dst), x.value));
+        self.buf += format!("mov {}, {}\n", self.local(x.dst), x.value);
     }
 
     fn instr_add(&mut self, x: tac::InstrAdd) {
-        self.buf
-            .add_assign(format!("mov eax, {}\n", self.local(x.lhs)));
-        self.buf
-            .add_assign(format!("mov edi, {}\n", self.local(x.rhs)));
-        self.buf.add_assign("add rax, rdi\n");
-        self.buf
-            .add_assign(format!("mov {}, eax\n", self.local(x.dst)));
+        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
+        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
+        self.buf += "add rax, rdi\n";
+        self.buf += format!("mov {}, eax\n", self.local(x.dst));
     }
 
     fn instr_sub(&mut self, x: tac::InstrSub) {
-        self.buf
-            .add_assign(format!("mov eax, {}\n", self.local(x.lhs)));
-        self.buf
-            .add_assign(format!("mov edi, {}\n", self.local(x.rhs)));
-        self.buf.add_assign("sub rax, rdi\n");
-        self.buf
-            .add_assign(format!("mov {}, eax\n", self.local(x.dst)));
+        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
+        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
+        self.buf += "sub rax, rdi\n";
+        self.buf += format!("mov {}, eax\n", self.local(x.dst));
     }
 
     fn instr_mul(&mut self, x: tac::InstrMul) {
-        self.buf
-            .add_assign(format!("mov eax, {}\n", self.local(x.lhs)));
-        self.buf
-            .add_assign(format!("mov edi, {}\n", self.local(x.rhs)));
-        self.buf.add_assign("imul rax, rdi\n");
-        self.buf
-            .add_assign(format!("mov {}, eax\n", self.local(x.dst)));
+        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
+        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
+        self.buf += "imul rax, rdi\n";
+        self.buf += format!("mov {}, eax\n", self.local(x.dst));
     }
 
     fn instr_div(&mut self, x: tac::InstrDiv) {
-        self.buf
-            .add_assign(format!("mov eax, {}\n", self.local(x.lhs)));
-        self.buf
-            .add_assign(format!("mov edi, {}\n", self.local(x.rhs)));
-        self.buf.add_assign("cqo\n");
-        self.buf.add_assign("idiv edi\n");
-        self.buf
-            .add_assign(format!("mov {}, eax\n", self.local(x.dst)));
+        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
+        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
+        self.buf += "cqo\n";
+        self.buf += "idiv edi\n";
+        self.buf += format!("mov {}, eax\n", self.local(x.dst));
     }
 
     fn instr_neg(&mut self, x: tac::InstrNeg) {
-        self.buf
-            .add_assign(format!("mov eax, {}\n", self.local(x.src)));
-        self.buf.add_assign("neg eax\n");
-        self.buf
-            .add_assign(format!("mov {}, eax\n", self.local(x.dst)));
+        self.buf += format!("mov eax, {}\n", self.local(x.src));
+        self.buf += "neg eax\n";
+        self.buf += format!("mov {}, eax\n", self.local(x.dst));
     }
 
     fn instr_eq(&mut self, x: tac::InstrEq) {
-        self.buf
-            .add_assign(format!("mov edi, {}\n", self.local(x.rhs)));
-        self.buf
-            .add_assign(format!("mov eax, {}\n", self.local(x.lhs)));
-        self.buf.add_assign("cmp eax, edi\n");
-        self.buf.add_assign("sete al\n");
-        self.buf.add_assign("movzx eax, al\n");
-        self.buf
-            .add_assign(format!("mov {}, eax\n", self.local(x.dst)));
+        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
+        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
+        self.buf += "cmp eax, edi\n";
+        self.buf += "sete al\n";
+        self.buf += "movzx eax, al\n";
+        self.buf += format!("mov {}, eax\n", self.local(x.dst));
     }
 
     fn instr_ne(&mut self, x: tac::InstrNe) {
-        self.buf
-            .add_assign(format!("mov edi, {}\n", self.local(x.rhs)));
-        self.buf
-            .add_assign(format!("mov eax, {}\n", self.local(x.lhs)));
-        self.buf.add_assign("cmp eax, edi\n");
-        self.buf.add_assign("setne al\n");
-        self.buf.add_assign("movzx eax, al\n");
-        self.buf
-            .add_assign(format!("mov {}, eax\n", self.local(x.dst)));
+        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
+        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
+        self.buf += "cmp eax, edi\n";
+        self.buf += "setne al\n";
+        self.buf += "movzx eax, al\n";
+        self.buf += format!("mov {}, eax\n", self.local(x.dst));
     }
 
     fn instr_lt(&mut self, x: tac::InstrLt) {
-        self.buf
-            .add_assign(format!("mov edi, {}\n", self.local(x.rhs)));
-        self.buf
-            .add_assign(format!("mov eax, {}\n", self.local(x.lhs)));
-        self.buf.add_assign("cmp eax, edi\n");
-        self.buf.add_assign("setl al\n");
-        self.buf.add_assign("movzx eax, al\n");
-        self.buf
-            .add_assign(format!("mov {}, eax\n", self.local(x.dst)));
+        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
+        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
+        self.buf += "cmp eax, edi\n";
+        self.buf += "setl al\n";
+        self.buf += "movzx eax, al\n";
+        self.buf += format!("mov {}, eax\n", self.local(x.dst));
     }
 
     fn instr_le(&mut self, x: tac::InstrLe) {
-        self.buf
-            .add_assign(format!("mov edi, {}\n", self.local(x.rhs)));
-        self.buf
-            .add_assign(format!("mov eax, {}\n", self.local(x.lhs)));
-        self.buf.add_assign("cmp eax, edi\n");
-        self.buf.add_assign("setle al\n");
-        self.buf.add_assign("movzx eax, al\n");
-        self.buf
-            .add_assign(format!("mov {}, eax\n", self.local(x.dst)));
+        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
+        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
+        self.buf += "cmp eax, edi\n";
+        self.buf += "setle al\n";
+        self.buf += "movzx eax, al\n";
+        self.buf += format!("mov {}, eax\n", self.local(x.dst));
     }
 
     fn instr_local_addr(&mut self, x: tac::InstrLocalAddr) {
-        self.buf
-            .add_assign(format!("lea rax, {}\n", self.local(x.src)));
-        self.buf
-            .add_assign(format!("mov {}, rax\n", self.local(x.dst)));
+        self.buf += format!("lea rax, {}\n", self.local(x.src));
+        self.buf += format!("mov {}, rax\n", self.local(x.dst));
     }
 
     fn instr_deref(&mut self, x: tac::InstrDeref) {
-        self.buf
-            .add_assign(format!("mov rax, {}\n", self.local(x.src)));
-        self.buf.add_assign("mov eax, [rax]\n");
-        self.buf
-            .add_assign(format!("mov {}, eax\n", self.local(x.dst)));
+        self.buf += format!("mov rax, {}\n", self.local(x.src));
+        self.buf += "mov eax, [rax]\n";
+        self.buf += format!("mov {}, eax\n", self.local(x.dst));
     }
 
     fn instr_assign_indirect(&mut self, x: tac::InstrAssignIndirect) {
         let src_bit = self.locals[x.src].bit;
         let di = Register::Rdi.for_bit(src_bit);
         let src_word = bit_to_word(src_bit);
-        self.buf
-            .add_assign(format!("mov rax, {}\n", self.local(x.dst)));
-        self.buf
-            .add_assign(format!("mov {di}, {}\n", self.local(x.src)));
-        self.buf
-            .add_assign(format!("mov {src_word} PTR [rax], {di}\n"));
+        self.buf += format!("mov rax, {}\n", self.local(x.dst));
+        self.buf += format!("mov {di}, {}\n", self.local(x.src));
+        self.buf += format!("mov {src_word} PTR [rax], {di}\n");
     }
 
     fn instr_label(&mut self, x: tac::InstrLabel) {
-        self.buf
-            .add_assign(format!(".L.{}.{}:\n", self.func_name, x.label));
+        self.buf += format!(".L.{}.{}:\n", self.func_name, x.label);
     }
 
     fn instr_jump(&mut self, x: tac::InstrJump) {
-        self.buf
-            .add_assign(format!("jmp .L.{}.{}\n", self.func_name, x.label));
+        self.buf += format!("jmp .L.{}.{}\n", self.func_name, x.label);
     }
 
     fn instr_jump_if(&mut self, x: tac::InstrJumpIf) {
-        self.buf
-            .add_assign(format!("mov eax, {}\n", self.local(x.cond)));
-        self.buf.add_assign("cmp eax, 0\n");
-        self.buf
-            .add_assign(format!("jne .L.{}.{}\n", self.func_name, x.label));
+        self.buf += format!("mov eax, {}\n", self.local(x.cond));
+        self.buf += "cmp eax, 0\n";
+        self.buf += format!("jne .L.{}.{}\n", self.func_name, x.label);
     }
 
     fn instr_jump_if_not(&mut self, x: tac::InstrJumpIfNot) {
-        self.buf
-            .add_assign(format!("mov eax, {}\n", self.local(x.cond)));
-        self.buf.add_assign("cmp eax, 0\n");
-        self.buf
-            .add_assign(format!("je .L.{}.{}\n", self.func_name, x.label));
+        self.buf += format!("mov eax, {}\n", self.local(x.cond));
+        self.buf += "cmp eax, 0\n";
+        self.buf += format!("je .L.{}.{}\n", self.func_name, x.label);
     }
 
     fn instr_call(&mut self, x: tac::InstrCall) {
         if let Some(arg) = x.args.get(0) {
-            self.buf
-                .add_assign(format!("mov edi, {}\n", self.local(*arg)));
+            self.buf += format!("mov edi, {}\n", self.local(*arg));
         }
 
         if let Some(arg) = x.args.get(1) {
-            self.buf
-                .add_assign(format!("mov esi, {}\n", self.local(*arg)));
+            self.buf += format!("mov esi, {}\n", self.local(*arg));
         }
 
         if let Some(arg) = x.args.get(2) {
-            self.buf
-                .add_assign(format!("mov edx, {}\n", self.local(*arg)));
+            self.buf += format!("mov edx, {}\n", self.local(*arg));
         }
 
         if let Some(arg) = x.args.get(3) {
-            self.buf
-                .add_assign(format!("mov ecx, {}\n", self.local(*arg)));
+            self.buf += format!("mov ecx, {}\n", self.local(*arg));
         }
 
         if let Some(arg) = x.args.get(4) {
-            self.buf
-                .add_assign(format!("mov r8d, {}\n", self.local(*arg)));
+            self.buf += format!("mov r8d, {}\n", self.local(*arg));
         }
 
         if let Some(arg) = x.args.get(5) {
-            self.buf
-                .add_assign(format!("mov r9d, {}\n", self.local(*arg)));
+            self.buf += format!("mov r9d, {}\n", self.local(*arg));
         }
 
         let extra_args_size = if x.args.len() > 6 {
@@ -493,24 +440,19 @@ impl FuncGenerator {
                     4)
                 .sum::<usize>();
             let extra_args_size = extra_args_size + (extra_args_size % 16);
-            self.buf
-                .add_assign(format!("sub rsp, {}\n", extra_args_size));
+            self.buf += format!("sub rsp, {}\n", extra_args_size);
             for (i, arg) in x.args.iter().enumerate().skip(6) {
-                self.buf
-                    .add_assign(format!("mov eax, {}\n", self.local(*arg)));
-                self.buf
-                    .add_assign(format!("mov DWORD PTR [rsp + {}], eax\n", (i - 6) * 4));
+                self.buf += format!("mov eax, {}\n", self.local(*arg));
+                self.buf += format!("mov DWORD PTR [rsp + {}], eax\n", (i - 6) * 4);
             }
             extra_args_size
         } else {
             0
         };
 
-        self.buf.add_assign(format!("call {}\n", x.ident));
-        self.buf
-            .add_assign(format!("add rsp, {}\n", extra_args_size));
-        self.buf
-            .add_assign(format!("mov {}, eax\n", self.local(x.dst)));
+        self.buf += format!("call {}\n", x.ident);
+        self.buf += format!("add rsp, {}\n", extra_args_size);
+        self.buf += format!("mov {}, eax\n", self.local(x.dst));
     }
 }
 

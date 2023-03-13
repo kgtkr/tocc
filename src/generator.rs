@@ -371,9 +371,11 @@ impl FuncGenerator {
     }
 
     fn instr_deref(&mut self, x: tac::InstrDeref) {
+        let dst_type = self.locals[x.dst].typ.clone();
+        let ax = Register::Rax.for_bit(dst_type.to_bit());
         self.buf += format!("mov rax, {}\n", self.local(x.src));
-        self.buf += "mov eax, [rax]\n";
-        self.buf += format!("mov {}, eax\n", self.local(x.dst));
+        self.buf += format!("mov {ax}, [rax]\n");
+        self.buf += format!("mov {}, {ax}\n", self.local(x.dst));
     }
 
     fn instr_assign_indirect(&mut self, x: tac::InstrAssignIndirect) {

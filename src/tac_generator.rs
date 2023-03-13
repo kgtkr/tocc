@@ -5,7 +5,7 @@ use crate::clang::{
     self, Decl, Expr, ExprIntLit, Program, Stmt, StmtCompound, StmtExpr, StmtIf, StmtReturn,
     StmtVarDecl,
 };
-use crate::loc::Loc;
+use crate::loc::{Loc, Locatable};
 use crate::{tac, Bit};
 use thiserror::Error;
 
@@ -68,10 +68,10 @@ impl InstrGenerator {
         use Stmt::*;
         match stmt {
             Expr(x) => {
-                self.stmt_expr(x);
+                self.stmt_expr(x)?;
             }
             Return(x) => {
-                self.stmt_return(x);
+                self.stmt_return(x)?;
             }
             Compound(x) => self.stmt_compound(x)?,
             VarDecl(x) => self.stmt_var_decl(x)?,
@@ -82,14 +82,15 @@ impl InstrGenerator {
         Ok(())
     }
 
-    fn stmt_expr(&mut self, x: StmtExpr) {
-        self.expr(x.expr);
+    fn stmt_expr(&mut self, x: StmtExpr) -> Result<usize, CodegenError> {
+        self.expr(x.expr)
     }
 
-    fn stmt_return(&mut self, x: StmtReturn) {
-        let src = self.expr(x.expr);
+    fn stmt_return(&mut self, x: StmtReturn) -> Result<(), CodegenError> {
+        let src = self.expr(x.expr)?;
         self.instrs
             .push(tac::Instr::Return(tac::InstrReturn { src }));
+        Ok(())
     }
 
     fn stmt_compound(&mut self, x: StmtCompound) -> Result<(), CodegenError> {
@@ -114,7 +115,7 @@ impl InstrGenerator {
         let else_label = self.generate_label();
         let end_label = self.generate_label();
 
-        let cond = self.expr(x.cond.clone());
+        let cond = self.expr(x.cond.clone())?;
 
         self.instrs.push(tac::Instr::JumpIfNot(tac::InstrJumpIfNot {
             cond,
@@ -140,7 +141,7 @@ impl InstrGenerator {
 
         self.instrs
             .push(tac::Instr::Label(tac::InstrLabel { label: cond_label }));
-        let cond = self.expr(x.cond.clone());
+        let cond = self.expr(x.cond.clone())?;
         self.instrs.push(tac::Instr::JumpIfNot(tac::InstrJumpIfNot {
             cond,
             label: end_label,
@@ -158,12 +159,12 @@ impl InstrGenerator {
         let end_label = self.generate_label();
 
         if let Some(init) = x.init {
-            self.expr(init);
+            self.expr(init)?;
         }
         self.instrs
             .push(tac::Instr::Label(tac::InstrLabel { label: cond_label }));
         if let Some(cond) = x.cond {
-            let cond = self.expr(cond);
+            let cond = self.expr(cond)?;
             self.instrs.push(tac::Instr::JumpIfNot(tac::InstrJumpIfNot {
                 cond,
                 label: end_label,
@@ -171,7 +172,7 @@ impl InstrGenerator {
         }
         self.stmt(*x.body.clone())?;
         if let Some(step) = x.step {
-            self.expr(step);
+            self.expr(step)?;
         }
         self.instrs
             .push(tac::Instr::Jump(tac::InstrJump { label: cond_label }));
@@ -180,7 +181,7 @@ impl InstrGenerator {
         Ok(())
     }
 
-    fn expr(&mut self, expr: Expr) -> usize {
+    fn expr(&mut self, expr: Expr) -> Result<usize, CodegenError> {
         use Expr::*;
         match expr {
             IntLit(x) => self.expr_int_lit(x),
@@ -202,164 +203,170 @@ impl InstrGenerator {
         }
     }
 
-    fn expr_int_lit(&mut self, x: ExprIntLit) -> usize {
+    fn expr_int_lit(&mut self, x: ExprIntLit) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
         self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
             dst,
             value: x.value,
         }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_add(&mut self, x: clang::ExprAdd) -> usize {
+    fn expr_add(&mut self, x: clang::ExprAdd) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
-        let lhs = self.expr(*x.lhs);
-        let rhs = self.expr(*x.rhs);
+        let lhs = self.expr(*x.lhs)?;
+        let rhs = self.expr(*x.rhs)?;
         self.instrs
             .push(tac::Instr::Add(tac::InstrAdd { dst, lhs, rhs }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_sub(&mut self, x: clang::ExprSub) -> usize {
+    fn expr_sub(&mut self, x: clang::ExprSub) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
-        let lhs = self.expr(*x.lhs);
-        let rhs = self.expr(*x.rhs);
+        let lhs = self.expr(*x.lhs)?;
+        let rhs = self.expr(*x.rhs)?;
         self.instrs
             .push(tac::Instr::Sub(tac::InstrSub { dst, lhs, rhs }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_mul(&mut self, x: clang::ExprMul) -> usize {
+    fn expr_mul(&mut self, x: clang::ExprMul) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
-        let lhs = self.expr(*x.lhs);
-        let rhs = self.expr(*x.rhs);
+        let lhs = self.expr(*x.lhs)?;
+        let rhs = self.expr(*x.rhs)?;
         self.instrs
             .push(tac::Instr::Mul(tac::InstrMul { dst, lhs, rhs }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_div(&mut self, x: clang::ExprDiv) -> usize {
+    fn expr_div(&mut self, x: clang::ExprDiv) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
-        let lhs = self.expr(*x.lhs);
-        let rhs = self.expr(*x.rhs);
+        let lhs = self.expr(*x.lhs)?;
+        let rhs = self.expr(*x.rhs)?;
         self.instrs
             .push(tac::Instr::Div(tac::InstrDiv { dst, lhs, rhs }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_neg(&mut self, x: clang::ExprNeg) -> usize {
+    fn expr_neg(&mut self, x: clang::ExprNeg) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
-        let src = self.expr(*x.expr);
+        let src = self.expr(*x.expr)?;
         self.instrs
             .push(tac::Instr::Neg(tac::InstrNeg { dst, src }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_eq(&mut self, x: clang::ExprEq) -> usize {
+    fn expr_eq(&mut self, x: clang::ExprEq) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
-        let lhs = self.expr(*x.lhs);
-        let rhs = self.expr(*x.rhs);
+        let lhs = self.expr(*x.lhs)?;
+        let rhs = self.expr(*x.rhs)?;
         self.instrs
             .push(tac::Instr::Eq(tac::InstrEq { dst, lhs, rhs }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_ne(&mut self, x: clang::ExprNe) -> usize {
+    fn expr_ne(&mut self, x: clang::ExprNe) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
-        let lhs = self.expr(*x.lhs);
-        let rhs = self.expr(*x.rhs);
+        let lhs = self.expr(*x.lhs)?;
+        let rhs = self.expr(*x.rhs)?;
         self.instrs
             .push(tac::Instr::Ne(tac::InstrNe { dst, lhs, rhs }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_lt(&mut self, x: clang::ExprLt) -> usize {
+    fn expr_lt(&mut self, x: clang::ExprLt) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
-        let lhs = self.expr(*x.lhs);
-        let rhs = self.expr(*x.rhs);
+        let lhs = self.expr(*x.lhs)?;
+        let rhs = self.expr(*x.rhs)?;
         self.instrs
             .push(tac::Instr::Lt(tac::InstrLt { dst, lhs, rhs }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_le(&mut self, x: clang::ExprLe) -> usize {
+    fn expr_le(&mut self, x: clang::ExprLe) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
-        let lhs = self.expr(*x.lhs);
-        let rhs = self.expr(*x.rhs);
+        let lhs = self.expr(*x.lhs)?;
+        let rhs = self.expr(*x.rhs)?;
         self.instrs
             .push(tac::Instr::Le(tac::InstrLe { dst, lhs, rhs }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_gt(&mut self, x: clang::ExprGt) -> usize {
+    fn expr_gt(&mut self, x: clang::ExprGt) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
-        let lhs = self.expr(*x.lhs);
-        let rhs = self.expr(*x.rhs);
+        let lhs = self.expr(*x.lhs)?;
+        let rhs = self.expr(*x.rhs)?;
         self.instrs.push(tac::Instr::Lt(tac::InstrLt {
             dst,
             lhs: rhs,
             rhs: lhs,
         }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_ge(&mut self, x: clang::ExprGe) -> usize {
+    fn expr_ge(&mut self, x: clang::ExprGe) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
-        let lhs = self.expr(*x.lhs);
-        let rhs = self.expr(*x.rhs);
+        let lhs = self.expr(*x.lhs)?;
+        let rhs = self.expr(*x.rhs)?;
         self.instrs.push(tac::Instr::Le(tac::InstrLe {
             dst,
             lhs: rhs,
             rhs: lhs,
         }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_assign(&mut self, x: clang::ExprAssign) -> usize {
+    fn expr_assign(&mut self, x: clang::ExprAssign) -> Result<usize, CodegenError> {
         let clang::Expr::LValue(lvalue) = *x.lhs else {
-            panic!("expected lvalue");
+            return Err(CodegenError {
+                loc: x.lhs.loc().clone(),
+                message: "expected lvalue".to_string(),
+            });
         };
-        let dst = self.lvalue(lvalue);
-        let src = self.expr(*x.rhs);
+        let dst = self.lvalue(lvalue)?;
+        let src = self.expr(*x.rhs)?;
         self.instrs
             .push(tac::Instr::AssignIndirect(tac::InstrAssignIndirect {
                 dst,
                 src,
             }));
-        src
+        Ok(src)
     }
 
-    fn expr_lvalue(&mut self, x: clang::ExprLValue) -> usize {
+    fn expr_lvalue(&mut self, x: clang::ExprLValue) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32); // TODO:
-        let src = self.lvalue(x);
+        let src = self.lvalue(x)?;
         self.instrs
             .push(tac::Instr::Deref(tac::InstrDeref { dst, src }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_call(&mut self, x: clang::ExprCall) -> usize {
+    fn expr_call(&mut self, x: clang::ExprCall) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit32);
         let args = x
             .args
             .into_iter()
             .map(|arg| self.expr(arg))
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, _>>()?;
         self.instrs.push(tac::Instr::Call(tac::InstrCall {
             dst,
             ident: x.ident,
             args,
         }));
-        dst
+        Ok(dst)
     }
 
-    fn expr_addr(&mut self, x: clang::ExprAddr) -> usize {
+    fn expr_addr(&mut self, x: clang::ExprAddr) -> Result<usize, CodegenError> {
         let clang::Expr::LValue(lvalue) = *x.expr else {
-            panic!("expected lvalue");
+            return Err(CodegenError {
+                loc: x.expr.loc().clone(),
+                message: "expected lvalue".to_string(),
+            });
         };
         self.lvalue(lvalue)
     }
 
-    fn lvalue(&mut self, x: clang::ExprLValue) -> usize {
+    fn lvalue(&mut self, x: clang::ExprLValue) -> Result<usize, CodegenError> {
         use clang::ExprLValue::*;
         match x {
             Var(x) => self.lvalue_var(x),
@@ -367,18 +374,21 @@ impl InstrGenerator {
         }
     }
 
-    fn lvalue_var(&mut self, x: clang::LValueVar) -> usize {
+    fn lvalue_var(&mut self, x: clang::LValueVar) -> Result<usize, CodegenError> {
         let dst = self.generate_local(Bit::Bit64);
         let src = *self
             .local_idents
             .get(&x.ident)
-            .expect("undeclared variable");
+            .ok_or_else(|| CodegenError {
+                loc: x.ident_loc.clone(),
+                message: format!("undeclared variable `{}`", x.ident),
+            })?;
         self.instrs
             .push(tac::Instr::LocalAddr(tac::InstrLocalAddr { dst, src }));
-        dst
+        Ok(dst)
     }
 
-    fn lvalue_deref(&mut self, x: clang::LValueDeref) -> usize {
+    fn lvalue_deref(&mut self, x: clang::LValueDeref) -> Result<usize, CodegenError> {
         self.expr(*x.expr)
     }
 }

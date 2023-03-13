@@ -185,7 +185,7 @@ impl FuncGenerator {
             .iter()
             .scan(8 /* rbpの分 */, |acc, local| {
                 let offset = *acc;
-                *acc += local.bit.to_size();
+                *acc += local.typ.to_bit().to_size();
                 Some(offset)
             })
             .collect::<Vec<_>>();
@@ -204,7 +204,7 @@ impl FuncGenerator {
         let locals_size = func
             .locals
             .iter()
-            .map(|local| local.bit.to_size())
+            .map(|local| local.typ.to_bit().to_size())
             .sum::<usize>();
 
         self.buf += format!("{}:\n", func.ident);
@@ -249,7 +249,7 @@ impl FuncGenerator {
     fn local(&self, local: usize) -> String {
         format!(
             "{} PTR [rbp-{}]",
-            match self.locals[local].bit {
+            match self.locals[local].typ.to_bit() {
                 Bit::Bit8 => "BYTE",
                 Bit::Bit16 => "WORD",
                 Bit::Bit32 => "DWORD",
@@ -377,7 +377,7 @@ impl FuncGenerator {
     }
 
     fn instr_assign_indirect(&mut self, x: tac::InstrAssignIndirect) {
-        let src_bit = self.locals[x.src].bit;
+        let src_bit = self.locals[x.src].typ.to_bit();
         let di = Register::Rdi.for_bit(src_bit);
         let src_word = bit_to_word(src_bit);
         self.buf += format!("mov rax, {}\n", self.local(x.dst));

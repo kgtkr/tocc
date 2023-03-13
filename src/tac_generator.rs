@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::clang::{
     self, Decl, Expr, ExprIntLit, Program, Stmt, StmtCompound, StmtExpr, StmtIf, StmtReturn,
-    StmtVarDecl,
+    StmtVarDecl, Type,
 };
 use crate::loc::{Loc, Locatable};
 use crate::{tac, Bit};
@@ -14,6 +14,15 @@ use thiserror::Error;
 pub struct CodegenError {
     loc: Loc,
     message: String,
+}
+
+fn convert_type(typ: Type) -> tac::Type {
+    match typ {
+        Type::Int(_) => tac::Type::Int(tac::TypeInt {}),
+        Type::Ptr(ptr) => tac::Type::Ptr(tac::TypePtr {
+            typ: Box::new(convert_type(*ptr.typ)),
+        }),
+    }
 }
 
 #[derive(Debug)]
@@ -38,9 +47,9 @@ impl InstrGenerator {
         &mut self,
         ident: String,
         ident_loc: &Loc,
-        bit: Bit,
+        typ: tac::Type,
     ) -> Result<usize, CodegenError> {
-        let local = self.generate_local(bit);
+        let local = self.generate_local(typ);
         if let Entry::Vacant(entry) = self.local_idents.entry(ident.clone()) {
             entry.insert(local);
             Ok(local)
@@ -52,9 +61,9 @@ impl InstrGenerator {
         }
     }
 
-    fn generate_local(&mut self, bit: Bit) -> usize {
+    fn generate_local(&mut self, typ: tac::Type) -> usize {
         let local = self.locals.len();
-        self.locals.push(tac::Local { bit });
+        self.locals.push(tac::Local { typ });
         local
     }
 
@@ -103,11 +112,7 @@ impl InstrGenerator {
     }
 
     fn stmt_var_decl(&mut self, x: StmtVarDecl) -> Result<(), CodegenError> {
-        let bit = match x.typ {
-            clang::Type::Int(_) => Bit::Bit32,
-            clang::Type::Ptr(_) => Bit::Bit64,
-        };
-        self.add_named_local(x.ident, &x.ident_loc, bit)?;
+        self.add_named_local(x.ident, &x.ident_loc, convert_type(x.typ))?;
         Ok(())
     }
 
@@ -204,7 +209,7 @@ impl InstrGenerator {
     }
 
     fn expr_int_lit(&mut self, x: ExprIntLit) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
             dst,
             value: x.value,
@@ -213,7 +218,7 @@ impl InstrGenerator {
     }
 
     fn expr_add(&mut self, x: clang::ExprAdd) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let lhs = self.expr(*x.lhs)?;
         let rhs = self.expr(*x.rhs)?;
         self.instrs
@@ -222,7 +227,7 @@ impl InstrGenerator {
     }
 
     fn expr_sub(&mut self, x: clang::ExprSub) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let lhs = self.expr(*x.lhs)?;
         let rhs = self.expr(*x.rhs)?;
         self.instrs
@@ -231,7 +236,7 @@ impl InstrGenerator {
     }
 
     fn expr_mul(&mut self, x: clang::ExprMul) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let lhs = self.expr(*x.lhs)?;
         let rhs = self.expr(*x.rhs)?;
         self.instrs
@@ -240,7 +245,7 @@ impl InstrGenerator {
     }
 
     fn expr_div(&mut self, x: clang::ExprDiv) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let lhs = self.expr(*x.lhs)?;
         let rhs = self.expr(*x.rhs)?;
         self.instrs
@@ -249,7 +254,7 @@ impl InstrGenerator {
     }
 
     fn expr_neg(&mut self, x: clang::ExprNeg) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let src = self.expr(*x.expr)?;
         self.instrs
             .push(tac::Instr::Neg(tac::InstrNeg { dst, src }));
@@ -257,7 +262,7 @@ impl InstrGenerator {
     }
 
     fn expr_eq(&mut self, x: clang::ExprEq) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let lhs = self.expr(*x.lhs)?;
         let rhs = self.expr(*x.rhs)?;
         self.instrs
@@ -266,7 +271,7 @@ impl InstrGenerator {
     }
 
     fn expr_ne(&mut self, x: clang::ExprNe) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let lhs = self.expr(*x.lhs)?;
         let rhs = self.expr(*x.rhs)?;
         self.instrs
@@ -275,7 +280,7 @@ impl InstrGenerator {
     }
 
     fn expr_lt(&mut self, x: clang::ExprLt) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let lhs = self.expr(*x.lhs)?;
         let rhs = self.expr(*x.rhs)?;
         self.instrs
@@ -284,7 +289,7 @@ impl InstrGenerator {
     }
 
     fn expr_le(&mut self, x: clang::ExprLe) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let lhs = self.expr(*x.lhs)?;
         let rhs = self.expr(*x.rhs)?;
         self.instrs
@@ -293,7 +298,7 @@ impl InstrGenerator {
     }
 
     fn expr_gt(&mut self, x: clang::ExprGt) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let lhs = self.expr(*x.lhs)?;
         let rhs = self.expr(*x.rhs)?;
         self.instrs.push(tac::Instr::Lt(tac::InstrLt {
@@ -305,7 +310,7 @@ impl InstrGenerator {
     }
 
     fn expr_ge(&mut self, x: clang::ExprGe) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let lhs = self.expr(*x.lhs)?;
         let rhs = self.expr(*x.rhs)?;
         self.instrs.push(tac::Instr::Le(tac::InstrLe {
@@ -334,15 +339,16 @@ impl InstrGenerator {
     }
 
     fn expr_lvalue(&mut self, x: clang::ExprLValue) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32); // TODO:
         let src = self.lvalue(x)?;
+        let src_type = self.locals[src].typ.clone();
+        let dst = self.generate_local(*src_type.unwrap_ptr().typ);
         self.instrs
             .push(tac::Instr::Deref(tac::InstrDeref { dst, src }));
         Ok(dst)
     }
 
     fn expr_call(&mut self, x: clang::ExprCall) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit32);
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let args = x
             .args
             .into_iter()
@@ -375,7 +381,6 @@ impl InstrGenerator {
     }
 
     fn lvalue_var(&mut self, x: clang::LValueVar) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(Bit::Bit64);
         let src = *self
             .local_idents
             .get(&x.ident)
@@ -383,6 +388,11 @@ impl InstrGenerator {
                 loc: x.ident_loc.clone(),
                 message: format!("undeclared variable `{}`", x.ident),
             })?;
+
+        let local = &self.locals[src];
+        let dst = self.generate_local(tac::Type::Ptr(tac::TypePtr {
+            typ: Box::new(local.typ.clone()),
+        }));
         self.instrs
             .push(tac::Instr::LocalAddr(tac::InstrLocalAddr { dst, src }));
         Ok(dst)
@@ -403,7 +413,11 @@ pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
                 Func(x) => {
                     let mut gen = InstrGenerator::new();
                     for param in &x.params {
-                        gen.add_named_local(param.ident.clone(), &param.ident_loc, Bit::Bit32)?;
+                        gen.add_named_local(
+                            param.ident.clone(),
+                            &param.ident_loc,
+                            tac::Type::Int(tac::TypeInt {}),
+                        )?;
                     }
                     gen.stmt_compound(x.body)?;
                     Ok(tac::Decl::Func(tac::DeclFunc {

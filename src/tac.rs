@@ -1,8 +1,32 @@
 use crate::Bit;
+use derive_more::Unwrap;
+
+#[derive(Debug, Clone, Unwrap)]
+pub enum Type {
+    Int(TypeInt),
+    Ptr(TypePtr),
+}
+
+impl Type {
+    pub fn to_bit(&self) -> Bit {
+        match self {
+            Type::Int(_) => Bit::Bit32,
+            Type::Ptr(_) => Bit::Bit64,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TypeInt {}
+
+#[derive(Debug, Clone)]
+pub struct TypePtr {
+    pub typ: Box<Type>,
+}
 
 #[derive(Debug, Clone)]
 pub struct Local {
-    pub bit: Bit,
+    pub typ: Type,
 }
 
 #[derive(Debug, Clone)]

@@ -356,8 +356,7 @@ impl InstrGenerator {
         let clang::Expr::LValue(lvalue) = *x.expr else {
             panic!("expected lvalue");
         };
-        let dst = self.lvalue(lvalue);
-        dst
+        self.lvalue(lvalue)
     }
 
     fn lvalue(&mut self, x: clang::ExprLValue) -> usize {
@@ -380,8 +379,7 @@ impl InstrGenerator {
     }
 
     fn lvalue_deref(&mut self, x: clang::LValueDeref) -> usize {
-        let dst = self.expr(*x.expr);
-        dst
+        self.expr(*x.expr)
     }
 }
 

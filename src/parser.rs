@@ -1,8 +1,8 @@
 use crate::clang::{
-    Decl, DeclFunc, DeclParam, Expr, ExprAdd, ExprAddr, ExprAssign, ExprCall, ExprDeref, ExprDiv,
-    ExprEq, ExprGe, ExprGt, ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg,
-    ExprSub, LValueDeref, LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf,
-    StmtReturn, StmtVarDecl, StmtWhile, Type, TypeInt, TypePtr,
+    Decl, DeclFunc, DeclParam, Expr, ExprAdd, ExprAddr, ExprAssign, ExprCall, ExprDiv, ExprEq,
+    ExprGe, ExprGt, ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprSub,
+    LValueDeref, LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf, StmtReturn,
+    StmtVarDecl, StmtWhile, Type, TypeInt, TypePtr,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -200,7 +200,6 @@ impl Parser {
                 Ok(expr)
             },
             |p| {
-                let token = p.peek().clone();
                 let (ident, ident_loc) = p.satisfy(|token| match &token.payload {
                     TokenPayload::Ident(ident) => Ok((ident.clone(), token.loc.clone())),
                     _ => Err(ParseErrorPayload::UnexpectedToken {
@@ -469,7 +468,6 @@ impl Parser {
     }
 
     fn stat(&mut self) -> Result<Stmt, ParseError> {
-        let token = self.peek().clone();
         parser_or!(
             self,
             |p| p.return_stmt().map(Stmt::Return),
@@ -621,7 +619,6 @@ impl Parser {
     }
 
     fn decl(&mut self) -> Result<Decl, ParseError> {
-        let token = self.peek().clone();
         self.func_decl().map(Decl::Func)
     }
 

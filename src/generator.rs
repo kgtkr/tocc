@@ -183,10 +183,9 @@ impl FuncGenerator {
         let local_offsets = func
             .locals
             .iter()
-            .scan(8 /* rbpの分 */, |acc, local| {
-                let offset = *acc;
+            .scan(0, |acc, local| {
                 *acc += local.typ.to_bit().to_size();
-                Some(offset)
+                Some(*acc)
             })
             .collect::<Vec<_>>();
 

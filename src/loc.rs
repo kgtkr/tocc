@@ -1,8 +1,8 @@
-use std::fmt;
+use std::{fmt, rc::Rc};
 
 #[derive(Debug, Clone)]
 pub struct Loc {
-    pub filename: String,
+    pub filename: Rc<String>,
     pub line: usize,
     pub col: usize,
 }

@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::loc::Loc;
 use crate::token::{Token, TokenPayload};
 use thiserror::Error;
@@ -23,7 +25,7 @@ impl Lexer {
             input: input.chars().collect(),
             idx: 0,
             loc: Loc {
-                filename,
+                filename: Rc::new(filename),
                 line: 1,
                 col: 1,
             },

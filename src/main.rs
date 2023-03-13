@@ -13,7 +13,7 @@ struct Args {
     output: String,
 }
 
-fn main() -> Result<(), anyhow::Error> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let input = read_to_string(&args.input)?;
     let tokens = Lexer::new(args.input.clone(), input).tokenize()?;

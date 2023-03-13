@@ -87,20 +87,6 @@ rec {
     #   inject test dependencies into the build
 
     crates = {
-      "anyhow" = rec {
-        crateName = "anyhow";
-        version = "1.0.65";
-        edition = "2018";
-        sha256 = "00jnbylbji1wxvgpk6fcpcxyh4firn223w0lpdvxm1117r71l5lq";
-        authors = [
-          "David Tolnay <dtolnay@gmail.com>"
-        ];
-        features = {
-          "backtrace" = [ "dep:backtrace" ];
-          "default" = [ "std" ];
-        };
-        resolvedDefaultFeatures = [ "default" "std" ];
-      };
       "atty" = rec {
         crateName = "atty";
         version = "0.2.14";
@@ -655,10 +641,6 @@ rec {
         ];
         src = lib.cleanSourceWith { filter = sourceFilter;  src = ./.; };
         dependencies = [
-          {
-            name = "anyhow";
-            packageId = "anyhow";
-          }
           {
             name = "clap";
             packageId = "clap";

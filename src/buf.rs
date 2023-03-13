@@ -2,6 +2,8 @@
 RopeのようなO(1)で連結できるバッファ
 */
 
+use std::ops::{Add, AddAssign};
+
 #[derive(Debug, Clone)]
 pub enum Buf {
     Leaf {
@@ -45,17 +47,6 @@ impl Buf {
         }
     }
 
-    pub fn join(self, other: impl Into<Buf>) -> Self {
-        let other = other.into();
-        let len = self.len() + other.len();
-
-        Self::Branch {
-            left: Box::new(self),
-            right: Box::new(other),
-            len,
-        }
-    }
-
     fn write_to_vec(&self, buf: &mut Vec<u8>) {
         match self {
             Self::Leaf { buf: leaf_buf } => {
@@ -70,10 +61,6 @@ impl Buf {
                 right.write_to_vec(buf);
             }
         }
-    }
-
-    pub fn append(&mut self, other: impl Into<Buf>) {
-        *self = std::mem::take(self).join(other);
     }
 }
 
@@ -108,5 +95,26 @@ impl From<&str> for Buf {
         Self::Leaf {
             buf: s.as_bytes().to_vec(),
         }
+    }
+}
+
+impl<T: Into<Buf>> Add<T> for Buf {
+    type Output = Self;
+
+    fn add(self, other: T) -> Self::Output {
+        let other = other.into();
+        let len = self.len() + other.len();
+
+        Self::Branch {
+            left: Box::new(self),
+            right: Box::new(other),
+            len,
+        }
+    }
+}
+
+impl<T: Into<Buf>> AddAssign<T> for Buf {
+    fn add_assign(&mut self, other: T) {
+        *self = std::mem::take(self) + other;
     }
 }

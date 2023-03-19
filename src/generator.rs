@@ -1,5 +1,5 @@
 use crate::buf::Buf;
-use crate::tac::{self, Decl, DeclFunc, Instr, InstrReturn, Program};
+use crate::tac::{self, Decl, DeclFunc, Instr, Program};
 use crate::Bit;
 
 #[derive(Debug, Copy, Clone)]
@@ -240,8 +240,8 @@ impl FuncGenerator {
                 self.buf += format!("mov {}, eax\n", self.local(6 + i),);
             }
         }
-        for instr in func.instrs {
-            self.instr(instr);
+        for bb in func.bbs {
+            self.bb(bb);
         }
     }
 
@@ -258,26 +258,47 @@ impl FuncGenerator {
         )
     }
 
+    fn bb(&mut self, bb: tac::BB) {
+        self.buf += format!(".BB.{}.{}:\n", self.func_name, bb.idx);
+        for instr in bb.instrs {
+            self.instr(instr);
+        }
+        match bb.term {
+            tac::BBTerm::Jump { idx } => {
+                if idx != bb.idx + 1 {
+                    self.buf += format!("jmp .BB.{}.{}\n", self.func_name, idx);
+                }
+            }
+            tac::BBTerm::JumpIf {
+                cond,
+                then_idx,
+                else_idx,
+            } => {
+                self.buf += format!("mov eax, {}\n", self.local(cond));
+                self.buf += "cmp eax, 0\n";
+                self.buf += format!("je .BB.{}.{}\n", self.func_name, else_idx);
+                if then_idx != bb.idx + 1 {
+                    // 現状の生成コードでは多分unreachable
+                    self.buf += format!("jmp .BB.{}.{}\n", self.func_name, then_idx);
+                }
+            }
+            tac::BBTerm::Return { src } => {
+                self.buf += format!("mov eax, {}\n", self.local(src));
+                self.buf += "leave\n";
+                self.buf += "ret\n";
+            }
+        }
+    }
+
     fn instr(&mut self, instr: Instr) {
         use Instr::*;
         match instr {
-            Return(x) => self.instr_return(x),
             IntConst(x) => self.instr_int_const(x),
             BinOp(x) => self.instr_bin_op(x),
             UnOp(x) => self.instr_un_op(x),
             AssignIndirect(x) => self.instr_assign_indirect(x),
-            Label(x) => self.instr_label(x),
-            Jump(x) => self.instr_jump(x),
-            JumpIf(x) => self.instr_jump_if(x),
-            JumpIfNot(x) => self.instr_jump_if_not(x),
             Call(x) => self.instr_call(x),
         }
-    }
-
-    fn instr_return(&mut self, x: InstrReturn) {
-        self.buf += format!("mov eax, {}\n", self.local(x.src));
-        self.buf += "leave\n";
-        self.buf += "ret\n";
     }
 
     fn instr_int_const(&mut self, x: tac::InstrIntConst) {
@@ -398,26 +419,6 @@ impl FuncGenerator {
         self.buf += format!("mov rax, {}\n", self.local(x.dst));
         self.buf += format!("mov {di}, {}\n", self.local(x.src));
         self.buf += format!("mov {src_word} PTR [rax], {di}\n");
-    }
-
-    fn instr_label(&mut self, x: tac::InstrLabel) {
-        self.buf += format!(".L.{}.{}:\n", self.func_name, x.label);
-    }
-
-    fn instr_jump(&mut self, x: tac::InstrJump) {
-        self.buf += format!("jmp .L.{}.{}\n", self.func_name, x.label);
-    }
-
-    fn instr_jump_if(&mut self, x: tac::InstrJumpIf) {
-        self.buf += format!("mov eax, {}\n", self.local(x.cond));
-        self.buf += "cmp eax, 0\n";
-        self.buf += format!("jne .L.{}.{}\n", self.func_name, x.label);
-    }
-
-    fn instr_jump_if_not(&mut self, x: tac::InstrJumpIfNot) {
-        self.buf += format!("mov eax, {}\n", self.local(x.cond));
-        self.buf += "cmp eax, 0\n";
-        self.buf += format!("je .L.{}.{}\n", self.func_name, x.label);
     }
 
     fn instr_call(&mut self, x: tac::InstrCall) {

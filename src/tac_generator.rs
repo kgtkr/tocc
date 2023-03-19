@@ -1,12 +1,13 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::mem;
 
 use crate::clang::{
     self, BinOp, Decl, Expr, ExprBinOp, ExprIntLit, Program, Stmt, StmtCompound, StmtExpr, StmtIf,
     StmtReturn, StmtVarDecl, Type,
 };
 use crate::loc::{Loc, Locatable};
-use crate::{tac, Bit};
+use crate::tac;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
@@ -30,7 +31,7 @@ struct InstrGenerator {
     locals: Vec<tac::Local>,
     instrs: Vec<tac::Instr>,
     local_idents: HashMap<String, usize>,
-    label_count: usize,
+    bbs: Vec<tac::BB>,
 }
 
 impl InstrGenerator {
@@ -39,7 +40,7 @@ impl InstrGenerator {
             locals: Vec::new(),
             instrs: Vec::new(),
             local_idents: HashMap::new(),
-            label_count: 0,
+            bbs: Vec::new(),
         }
     }
 
@@ -67,10 +68,14 @@ impl InstrGenerator {
         local
     }
 
-    fn generate_label(&mut self) -> usize {
-        let label = self.label_count;
-        self.label_count += 1;
-        label
+    fn new_bb(&mut self, term: tac::BBTerm) -> usize {
+        let idx = self.bbs.len();
+        self.bbs.push(tac::BB {
+            idx,
+            instrs: mem::take(&mut self.instrs),
+            term,
+        });
+        idx
     }
 
     fn stmt(&mut self, stmt: Stmt) -> Result<(), CodegenError> {
@@ -97,8 +102,7 @@ impl InstrGenerator {
 
     fn stmt_return(&mut self, x: StmtReturn) -> Result<(), CodegenError> {
         let src = self.expr(x.expr)?;
-        self.instrs
-            .push(tac::Instr::Return(tac::InstrReturn { src }));
+        self.new_bb(tac::BBTerm::Return { src });
         Ok(())
     }
 
@@ -117,72 +121,87 @@ impl InstrGenerator {
     }
 
     fn stmt_if(&mut self, x: StmtIf) -> Result<(), CodegenError> {
-        let else_label = self.generate_label();
-        let end_label = self.generate_label();
-
         let cond = self.expr(x.cond.clone())?;
+        let cond_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
 
-        self.instrs.push(tac::Instr::JumpIfNot(tac::InstrJumpIfNot {
-            cond,
-            label: else_label,
-        }));
-
+        let then_bb_idx = self.bbs.len();
         self.stmt(*x.then)?;
-        self.instrs
-            .push(tac::Instr::Jump(tac::InstrJump { label: end_label }));
-        self.instrs
-            .push(tac::Instr::Label(tac::InstrLabel { label: else_label }));
+        let then_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+
+        let else_bb_idx = self.bbs.len();
         if let Some(else_) = x.else_ {
             self.stmt(*else_)?;
         }
-        self.instrs
-            .push(tac::Instr::Label(tac::InstrLabel { label: end_label }));
+        let else_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+        let next_bb_idx = self.bbs.len();
+
+        self.bbs[cond_dummy_bb_idx].term = tac::BBTerm::JumpIf {
+            cond,
+            then_idx: then_bb_idx,
+            else_idx: else_bb_idx,
+        };
+        self.bbs[then_dummy_bb_idx].term = tac::BBTerm::Jump { idx: next_bb_idx };
+        self.bbs[else_dummy_bb_idx].term = tac::BBTerm::Jump { idx: next_bb_idx };
+
         Ok(())
     }
 
     fn stmt_while(&mut self, x: clang::StmtWhile) -> Result<(), CodegenError> {
-        let cond_label = self.generate_label();
-        let end_label = self.generate_label();
+        let start_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
 
-        self.instrs
-            .push(tac::Instr::Label(tac::InstrLabel { label: cond_label }));
+        let cond_bb_idx = self.bbs.len();
         let cond = self.expr(x.cond.clone())?;
-        self.instrs.push(tac::Instr::JumpIfNot(tac::InstrJumpIfNot {
-            cond,
-            label: end_label,
-        }));
+        let cond_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+
+        let body_bb_idx = self.bbs.len();
         self.stmt(*x.body)?;
-        self.instrs
-            .push(tac::Instr::Jump(tac::InstrJump { label: cond_label }));
-        self.instrs
-            .push(tac::Instr::Label(tac::InstrLabel { label: end_label }));
+        let body_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+
+        let next_bb_idx = self.bbs.len();
+
+        self.bbs[start_dummy_bb_idx].term = tac::BBTerm::Jump { idx: cond_bb_idx };
+        self.bbs[cond_dummy_bb_idx].term = tac::BBTerm::JumpIf {
+            cond,
+            then_idx: body_bb_idx,
+            else_idx: next_bb_idx,
+        };
+        self.bbs[body_dummy_bb_idx].term = tac::BBTerm::Jump { idx: cond_bb_idx };
         Ok(())
     }
 
     fn stmt_for(&mut self, x: clang::StmtFor) -> Result<(), CodegenError> {
-        let cond_label = self.generate_label();
-        let end_label = self.generate_label();
-
         if let Some(init) = x.init {
             self.expr(init)?;
         }
-        self.instrs
-            .push(tac::Instr::Label(tac::InstrLabel { label: cond_label }));
-        if let Some(cond) = x.cond {
-            let cond = self.expr(cond)?;
-            self.instrs.push(tac::Instr::JumpIfNot(tac::InstrJumpIfNot {
-                cond,
-                label: end_label,
-            }));
-        }
+        let start_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+
+        let cond_bb_idx = self.bbs.len();
+        let cond = if let Some(cond) = x.cond {
+            self.expr(cond)?
+        } else {
+            let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+            self.instrs
+                .push(tac::Instr::IntConst(tac::InstrIntConst { dst, value: 1 }));
+            dst
+        };
+        let cond_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+
+        let body_bb_idx = self.bbs.len();
         self.stmt(*x.body.clone())?;
         if let Some(step) = x.step {
             self.expr(step)?;
         }
-        self.instrs
-            .push(tac::Instr::Jump(tac::InstrJump { label: cond_label }));
-        self.instrs
-            .push(tac::Instr::Label(tac::InstrLabel { label: end_label }));
+        let body_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+
+        let next_bb_idx = self.bbs.len();
+
+        self.bbs[start_dummy_bb_idx].term = tac::BBTerm::Jump { idx: cond_bb_idx };
+        self.bbs[cond_dummy_bb_idx].term = tac::BBTerm::JumpIf {
+            cond,
+            then_idx: body_bb_idx,
+            else_idx: next_bb_idx,
+        };
+        self.bbs[body_dummy_bb_idx].term = tac::BBTerm::Jump { idx: cond_bb_idx };
         Ok(())
     }
 
@@ -473,7 +492,7 @@ pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
                         ident: x.ident,
                         args_count: x.params.len(),
                         locals: gen.locals,
-                        instrs: gen.instrs,
+                        bbs: gen.bbs,
                     }))
                 }
             }

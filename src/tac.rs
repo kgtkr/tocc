@@ -45,26 +45,46 @@ pub struct DeclFunc {
     // localsの先頭args_countに引数が入る
     pub args_count: usize,
     pub locals: Vec<Local>,
+    pub bbs: Vec<BB>,
+}
+
+#[derive(Debug, Clone)]
+// Basic Block
+pub struct BB {
+    pub idx: usize,
     pub instrs: Vec<Instr>,
+    pub term: BBTerm,
+}
+
+#[derive(Debug, Clone)]
+// terminator
+pub enum BBTerm {
+    Jump {
+        idx: usize,
+    },
+    JumpIf {
+        cond: usize,
+        then_idx: usize,
+        else_idx: usize,
+    },
+    Return {
+        src: usize,
+    },
+}
+
+impl BBTerm {
+    pub fn dummy() -> Self {
+        BBTerm::Jump { idx: 0 }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Instr {
-    Return(InstrReturn),
     IntConst(InstrIntConst),
     BinOp(InstrBinOp),
     UnOp(InstrUnOp),
     AssignIndirect(InstrAssignIndirect),
-    Label(InstrLabel),
-    Jump(InstrJump),
-    JumpIf(InstrJumpIf),
-    JumpIfNot(InstrJumpIfNot),
     Call(InstrCall),
-}
-
-#[derive(Debug, Clone)]
-pub struct InstrReturn {
-    pub src: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -111,28 +131,6 @@ pub struct InstrUnOp {
 pub struct InstrAssignIndirect {
     pub dst: usize,
     pub src: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstrLabel {
-    pub label: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstrJump {
-    pub label: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstrJumpIf {
-    pub label: usize,
-    pub cond: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstrJumpIfNot {
-    pub label: usize,
-    pub cond: usize,
 }
 
 #[derive(Debug, Clone)]

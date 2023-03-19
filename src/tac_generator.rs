@@ -2,8 +2,8 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 use crate::clang::{
-    self, Decl, Expr, ExprIntLit, Program, Stmt, StmtCompound, StmtExpr, StmtIf, StmtReturn,
-    StmtVarDecl, Type,
+    self, BinOp, Decl, Expr, ExprBinOp, ExprIntLit, Program, Stmt, StmtCompound, StmtExpr, StmtIf,
+    StmtReturn, StmtVarDecl, Type,
 };
 use crate::loc::{Loc, Locatable};
 use crate::{tac, Bit};
@@ -190,19 +190,9 @@ impl InstrGenerator {
         use Expr::*;
         match expr {
             IntLit(x) => self.expr_int_lit(x),
-            Add(x) => self.expr_add(x),
-            Sub(x) => self.expr_sub(x),
-            Mul(x) => self.expr_mul(x),
-            Div(x) => self.expr_div(x),
+            BinOp(x) => self.expr_bin_op(x),
             Neg(x) => self.expr_neg(x),
-            Eq(x) => self.expr_eq(x),
-            Ne(x) => self.expr_ne(x),
-            Lt(x) => self.expr_lt(x),
-            Le(x) => self.expr_le(x),
-            Gt(x) => self.expr_gt(x),
-            Ge(x) => self.expr_ge(x),
             LValue(x) => self.expr_lvalue(x),
-            Assign(x) => self.expr_assign(x),
             Call(x) => self.expr_call(x),
             Addr(x) => self.expr_addr(x),
         }
@@ -217,40 +207,167 @@ impl InstrGenerator {
         Ok(dst)
     }
 
-    fn expr_add(&mut self, x: clang::ExprAdd) -> Result<usize, CodegenError> {
+    fn expr_bin_op(&mut self, x: ExprBinOp) -> Result<usize, CodegenError> {
+        match x.op {
+            BinOp::Add => self.bin_op_add(*x.lhs, *x.rhs),
+            BinOp::Sub => self.bin_op_sub(*x.lhs, *x.rhs),
+            BinOp::Mul => self.bin_op_mul(*x.lhs, *x.rhs),
+            BinOp::Div => self.bin_op_div(*x.lhs, *x.rhs),
+            BinOp::Eq => self.bin_op_eq(*x.lhs, *x.rhs),
+            BinOp::Ne => self.bin_op_ne(*x.lhs, *x.rhs),
+            BinOp::Lt => self.bin_op_lt(*x.lhs, *x.rhs),
+            BinOp::Le => self.bin_op_le(*x.lhs, *x.rhs),
+            BinOp::Gt => self.bin_op_gt(*x.lhs, *x.rhs),
+            BinOp::Ge => self.bin_op_ge(*x.lhs, *x.rhs),
+            BinOp::Assign => self.bin_op_assign(*x.lhs, *x.rhs),
+        }
+    }
+
+    fn bin_op_add(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
         let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-        let lhs = self.expr(*x.lhs)?;
-        let rhs = self.expr(*x.rhs)?;
-        self.instrs
-            .push(tac::Instr::Add(tac::InstrAdd { dst, lhs, rhs }));
+        let lhs = self.expr(lhs)?;
+        let rhs = self.expr(rhs)?;
+        self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+            dst,
+            lhs,
+            rhs,
+            op: tac::BinOp::Add,
+        }));
         Ok(dst)
     }
 
-    fn expr_sub(&mut self, x: clang::ExprSub) -> Result<usize, CodegenError> {
+    fn bin_op_sub(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
         let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-        let lhs = self.expr(*x.lhs)?;
-        let rhs = self.expr(*x.rhs)?;
-        self.instrs
-            .push(tac::Instr::Sub(tac::InstrSub { dst, lhs, rhs }));
+        let lhs = self.expr(lhs)?;
+        let rhs = self.expr(rhs)?;
+        self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+            dst,
+            lhs,
+            rhs,
+            op: tac::BinOp::Sub,
+        }));
         Ok(dst)
     }
 
-    fn expr_mul(&mut self, x: clang::ExprMul) -> Result<usize, CodegenError> {
+    fn bin_op_mul(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
         let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-        let lhs = self.expr(*x.lhs)?;
-        let rhs = self.expr(*x.rhs)?;
-        self.instrs
-            .push(tac::Instr::Mul(tac::InstrMul { dst, lhs, rhs }));
+        let lhs = self.expr(lhs)?;
+        let rhs = self.expr(rhs)?;
+        self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+            dst,
+            lhs,
+            rhs,
+            op: tac::BinOp::Mul,
+        }));
         Ok(dst)
     }
 
-    fn expr_div(&mut self, x: clang::ExprDiv) -> Result<usize, CodegenError> {
+    fn bin_op_div(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
         let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-        let lhs = self.expr(*x.lhs)?;
-        let rhs = self.expr(*x.rhs)?;
-        self.instrs
-            .push(tac::Instr::Div(tac::InstrDiv { dst, lhs, rhs }));
+        let lhs = self.expr(lhs)?;
+        let rhs = self.expr(rhs)?;
+        self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+            dst,
+            lhs,
+            rhs,
+            op: tac::BinOp::Div,
+        }));
         Ok(dst)
+    }
+
+    fn bin_op_eq(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let lhs = self.expr(lhs)?;
+        let rhs = self.expr(rhs)?;
+        self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+            dst,
+            lhs,
+            rhs,
+            op: tac::BinOp::Eq,
+        }));
+        Ok(dst)
+    }
+
+    fn bin_op_ne(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let lhs = self.expr(lhs)?;
+        let rhs = self.expr(rhs)?;
+        self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+            dst,
+            lhs,
+            rhs,
+            op: tac::BinOp::Ne,
+        }));
+        Ok(dst)
+    }
+
+    fn bin_op_lt(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let lhs = self.expr(lhs)?;
+        let rhs = self.expr(rhs)?;
+        self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+            dst,
+            lhs,
+            rhs,
+            op: tac::BinOp::Lt,
+        }));
+        Ok(dst)
+    }
+
+    fn bin_op_le(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let lhs = self.expr(lhs)?;
+        let rhs = self.expr(rhs)?;
+        self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+            dst,
+            lhs,
+            rhs,
+            op: tac::BinOp::Le,
+        }));
+        Ok(dst)
+    }
+
+    fn bin_op_gt(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let lhs = self.expr(lhs)?;
+        let rhs = self.expr(rhs)?;
+        self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+            dst,
+            lhs: rhs,
+            rhs: lhs,
+            op: tac::BinOp::Lt,
+        }));
+        Ok(dst)
+    }
+
+    fn bin_op_ge(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
+        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let lhs = self.expr(lhs)?;
+        let rhs = self.expr(rhs)?;
+        self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+            dst,
+            lhs: rhs,
+            rhs: lhs,
+            op: tac::BinOp::Le,
+        }));
+        Ok(dst)
+    }
+
+    fn bin_op_assign(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
+        let clang::Expr::LValue(lvalue) = lhs else {
+            return Err(CodegenError {
+                loc: lhs.loc().clone(),
+                message: "expected lvalue".to_string(),
+            });
+        };
+        let dst = self.lvalue(lvalue)?;
+        let src = self.expr(rhs)?;
+        self.instrs
+            .push(tac::Instr::AssignIndirect(tac::InstrAssignIndirect {
+                dst,
+                src,
+            }));
+        Ok(src)
     }
 
     fn expr_neg(&mut self, x: clang::ExprNeg) -> Result<usize, CodegenError> {
@@ -259,83 +376,6 @@ impl InstrGenerator {
         self.instrs
             .push(tac::Instr::Neg(tac::InstrNeg { dst, src }));
         Ok(dst)
-    }
-
-    fn expr_eq(&mut self, x: clang::ExprEq) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-        let lhs = self.expr(*x.lhs)?;
-        let rhs = self.expr(*x.rhs)?;
-        self.instrs
-            .push(tac::Instr::Eq(tac::InstrEq { dst, lhs, rhs }));
-        Ok(dst)
-    }
-
-    fn expr_ne(&mut self, x: clang::ExprNe) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-        let lhs = self.expr(*x.lhs)?;
-        let rhs = self.expr(*x.rhs)?;
-        self.instrs
-            .push(tac::Instr::Ne(tac::InstrNe { dst, lhs, rhs }));
-        Ok(dst)
-    }
-
-    fn expr_lt(&mut self, x: clang::ExprLt) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-        let lhs = self.expr(*x.lhs)?;
-        let rhs = self.expr(*x.rhs)?;
-        self.instrs
-            .push(tac::Instr::Lt(tac::InstrLt { dst, lhs, rhs }));
-        Ok(dst)
-    }
-
-    fn expr_le(&mut self, x: clang::ExprLe) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-        let lhs = self.expr(*x.lhs)?;
-        let rhs = self.expr(*x.rhs)?;
-        self.instrs
-            .push(tac::Instr::Le(tac::InstrLe { dst, lhs, rhs }));
-        Ok(dst)
-    }
-
-    fn expr_gt(&mut self, x: clang::ExprGt) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-        let lhs = self.expr(*x.lhs)?;
-        let rhs = self.expr(*x.rhs)?;
-        self.instrs.push(tac::Instr::Lt(tac::InstrLt {
-            dst,
-            lhs: rhs,
-            rhs: lhs,
-        }));
-        Ok(dst)
-    }
-
-    fn expr_ge(&mut self, x: clang::ExprGe) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-        let lhs = self.expr(*x.lhs)?;
-        let rhs = self.expr(*x.rhs)?;
-        self.instrs.push(tac::Instr::Le(tac::InstrLe {
-            dst,
-            lhs: rhs,
-            rhs: lhs,
-        }));
-        Ok(dst)
-    }
-
-    fn expr_assign(&mut self, x: clang::ExprAssign) -> Result<usize, CodegenError> {
-        let clang::Expr::LValue(lvalue) = *x.lhs else {
-            return Err(CodegenError {
-                loc: x.lhs.loc().clone(),
-                message: "expected lvalue".to_string(),
-            });
-        };
-        let dst = self.lvalue(lvalue)?;
-        let src = self.expr(*x.rhs)?;
-        self.instrs
-            .push(tac::Instr::AssignIndirect(tac::InstrAssignIndirect {
-                dst,
-                src,
-            }));
-        Ok(src)
     }
 
     fn expr_lvalue(&mut self, x: clang::ExprLValue) -> Result<usize, CodegenError> {

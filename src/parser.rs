@@ -1,8 +1,7 @@
 use crate::clang::{
-    Decl, DeclFunc, DeclParam, Expr, ExprAdd, ExprAddr, ExprAssign, ExprCall, ExprDiv, ExprEq,
-    ExprGe, ExprGt, ExprIntLit, ExprLValue, ExprLe, ExprLt, ExprMul, ExprNe, ExprNeg, ExprSub,
-    LValueDeref, LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf, StmtReturn,
-    StmtVarDecl, StmtWhile, Type, TypeInt, TypePtr,
+    BinOp, Decl, DeclFunc, DeclParam, Expr, ExprAddr, ExprBinOp, ExprCall, ExprIntLit, ExprLValue,
+    ExprNeg, LValueDeref, LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf,
+    StmtReturn, StmtVarDecl, StmtWhile, Type, TypeInt, TypePtr,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -306,13 +305,15 @@ impl Parser {
             },
             expr,
             |expr, (op, rhs)| match op {
-                Op::Mul => Expr::Mul(ExprMul {
+                Op::Mul => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
+                    op: BinOp::Mul,
                 }),
-                Op::Div => Expr::Div(ExprDiv {
+                Op::Div => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
+                    op: BinOp::Div,
                 }),
             },
         )
@@ -342,13 +343,15 @@ impl Parser {
             },
             expr,
             |expr, (op, rhs)| match op {
-                Op::Add => Expr::Add(ExprAdd {
+                Op::Add => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
+                    op: BinOp::Add,
                 }),
-                Op::Sub => Expr::Sub(ExprSub {
+                Op::Sub => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
+                    op: BinOp::Sub,
                 }),
             },
         )
@@ -390,21 +393,25 @@ impl Parser {
             },
             expr,
             |expr, (op, rhs)| match op {
-                Op::Lt => Expr::Lt(ExprLt {
+                Op::Lt => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
+                    op: BinOp::Lt,
                 }),
-                Op::Le => Expr::Le(ExprLe {
+                Op::Le => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
+                    op: BinOp::Le,
                 }),
-                Op::Gt => Expr::Gt(ExprGt {
+                Op::Gt => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
+                    op: BinOp::Gt,
                 }),
-                Op::Ge => Expr::Ge(ExprGe {
+                Op::Ge => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
+                    op: BinOp::Ge,
                 }),
             },
         )
@@ -434,13 +441,15 @@ impl Parser {
             },
             expr,
             |expr, (op, rhs)| match op {
-                Op::Eq => Expr::Eq(ExprEq {
+                Op::Eq => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
+                    op: BinOp::Eq,
                 }),
-                Op::Ne => Expr::Ne(ExprNe {
+                Op::Ne => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
+                    op: BinOp::Ne,
                 }),
             },
         )
@@ -453,9 +462,10 @@ impl Parser {
             |p| {
                 p.satisfy_(|token| matches!(token.payload, TokenPayload::Eq), "=")?;
                 let rhs = p.assign()?;
-                Ok(Expr::Assign(ExprAssign {
+                Ok(Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr.clone()),
                     rhs: Box::new(rhs),
+                    op: BinOp::Assign,
                 }))
             },
             |_| Ok(expr.clone()),

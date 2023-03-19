@@ -52,15 +52,8 @@ pub struct DeclFunc {
 pub enum Instr {
     Return(InstrReturn),
     IntConst(InstrIntConst),
-    Add(InstrAdd),
-    Sub(InstrSub),
-    Mul(InstrMul),
-    Div(InstrDiv),
+    BinOp(InstrBinOp),
     Neg(InstrNeg),
-    Eq(InstrEq),
-    Ne(InstrNe),
-    Lt(InstrLt),
-    Le(InstrLe),
     LocalAddr(InstrLocalAddr),
     Deref(InstrDeref),
     AssignIndirect(InstrAssignIndirect),
@@ -82,30 +75,22 @@ pub struct InstrIntConst {
     pub value: i64,
 }
 
-#[derive(Debug, Clone)]
-pub struct InstrAdd {
-    pub dst: usize,
-    pub lhs: usize,
-    pub rhs: usize,
+#[derive(Debug, Clone, Copy)]
+pub enum BinOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Eq,
+    Ne,
+    Lt,
+    Le,
 }
 
 #[derive(Debug, Clone)]
-pub struct InstrSub {
+pub struct InstrBinOp {
     pub dst: usize,
-    pub lhs: usize,
-    pub rhs: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstrMul {
-    pub dst: usize,
-    pub lhs: usize,
-    pub rhs: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstrDiv {
-    pub dst: usize,
+    pub op: BinOp,
     pub lhs: usize,
     pub rhs: usize,
 }
@@ -114,34 +99,6 @@ pub struct InstrDiv {
 pub struct InstrNeg {
     pub dst: usize,
     pub src: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstrEq {
-    pub dst: usize,
-    pub lhs: usize,
-    pub rhs: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstrNe {
-    pub dst: usize,
-    pub lhs: usize,
-    pub rhs: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstrLt {
-    pub dst: usize,
-    pub lhs: usize,
-    pub rhs: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstrLe {
-    pub dst: usize,
-    pub lhs: usize,
-    pub rhs: usize,
 }
 
 #[derive(Debug, Clone)]

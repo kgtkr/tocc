@@ -201,43 +201,51 @@ impl Locatable for StmtFor {
 #[derive(Debug, Clone)]
 pub enum Expr {
     IntLit(ExprIntLit),
-    Add(ExprAdd),
-    Sub(ExprSub),
-    Mul(ExprMul),
-    Div(ExprDiv),
+    BinOp(ExprBinOp),
     Neg(ExprNeg),
-    Eq(ExprEq),
-    Ne(ExprNe),
-    Lt(ExprLt),
-    Le(ExprLe),
-    Gt(ExprGt),
-    Ge(ExprGe),
-    LValue(ExprLValue),
-    Assign(ExprAssign),
-    Call(ExprCall),
     Addr(ExprAddr),
+    LValue(ExprLValue),
+    Call(ExprCall),
 }
 
 impl Locatable for Expr {
     fn loc(&self) -> &Loc {
         match self {
             Expr::IntLit(x) => x.loc(),
-            Expr::Add(x) => x.loc(),
-            Expr::Sub(x) => x.loc(),
-            Expr::Mul(x) => x.loc(),
-            Expr::Div(x) => x.loc(),
+            Expr::BinOp(x) => x.loc(),
             Expr::Neg(x) => x.loc(),
-            Expr::Eq(x) => x.loc(),
-            Expr::Ne(x) => x.loc(),
-            Expr::Lt(x) => x.loc(),
-            Expr::Le(x) => x.loc(),
-            Expr::Gt(x) => x.loc(),
-            Expr::Ge(x) => x.loc(),
             Expr::LValue(x) => x.loc(),
-            Expr::Assign(x) => x.loc(),
             Expr::Call(x) => x.loc(),
             Expr::Addr(x) => x.loc(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BinOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Assign,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprBinOp {
+    pub op: BinOp,
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
+impl Locatable for ExprBinOp {
+    fn loc(&self) -> &Loc {
+        self.lhs.loc()
     }
 }
 
@@ -269,54 +277,6 @@ impl Locatable for ExprIntLit {
 }
 
 #[derive(Debug, Clone)]
-pub struct ExprAdd {
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-impl Locatable for ExprAdd {
-    fn loc(&self) -> &Loc {
-        self.lhs.loc()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ExprSub {
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-impl Locatable for ExprSub {
-    fn loc(&self) -> &Loc {
-        self.lhs.loc()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ExprMul {
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-impl Locatable for ExprMul {
-    fn loc(&self) -> &Loc {
-        self.lhs.loc()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ExprDiv {
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-impl Locatable for ExprDiv {
-    fn loc(&self) -> &Loc {
-        self.lhs.loc()
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct ExprNeg {
     pub minus_loc: Loc,
     pub expr: Box<Expr>,
@@ -325,78 +285,6 @@ pub struct ExprNeg {
 impl Locatable for ExprNeg {
     fn loc(&self) -> &Loc {
         &self.minus_loc
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ExprEq {
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-impl Locatable for ExprEq {
-    fn loc(&self) -> &Loc {
-        self.lhs.loc()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ExprNe {
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-impl Locatable for ExprNe {
-    fn loc(&self) -> &Loc {
-        self.lhs.loc()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ExprLt {
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-impl Locatable for ExprLt {
-    fn loc(&self) -> &Loc {
-        self.lhs.loc()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ExprLe {
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-impl Locatable for ExprLe {
-    fn loc(&self) -> &Loc {
-        self.lhs.loc()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ExprGt {
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-impl Locatable for ExprGt {
-    fn loc(&self) -> &Loc {
-        self.lhs.loc()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ExprGe {
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-impl Locatable for ExprGe {
-    fn loc(&self) -> &Loc {
-        self.lhs.loc()
     }
 }
 
@@ -421,18 +309,6 @@ pub struct LValueDeref {
 impl Locatable for LValueDeref {
     fn loc(&self) -> &Loc {
         &self.star_loc
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ExprAssign {
-    pub lhs: Box<Expr>,
-    pub rhs: Box<Expr>,
-}
-
-impl Locatable for ExprAssign {
-    fn loc(&self) -> &Loc {
-        self.lhs.loc()
     }
 }
 

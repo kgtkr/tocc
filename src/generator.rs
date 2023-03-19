@@ -263,15 +263,8 @@ impl FuncGenerator {
         match instr {
             Return(x) => self.instr_return(x),
             IntConst(x) => self.instr_int_const(x),
-            Add(x) => self.instr_add(x),
-            Sub(x) => self.instr_sub(x),
-            Mul(x) => self.instr_mul(x),
-            Div(x) => self.instr_div(x),
+            BinOp(x) => self.instr_bin_op(x),
             Neg(x) => self.instr_neg(x),
-            Eq(x) => self.instr_eq(x),
-            Ne(x) => self.instr_ne(x),
-            Lt(x) => self.instr_lt(x),
-            Le(x) => self.instr_le(x),
             LocalAddr(x) => self.instr_local_addr(x),
             Deref(x) => self.instr_deref(x),
             AssignIndirect(x) => self.instr_assign_indirect(x),
@@ -293,74 +286,88 @@ impl FuncGenerator {
         self.buf += format!("mov {}, {}\n", self.local(x.dst), x.value);
     }
 
-    fn instr_add(&mut self, x: tac::InstrAdd) {
-        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
-        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
+    fn instr_bin_op(&mut self, x: tac::InstrBinOp) {
+        use tac::BinOp::*;
+        match x.op {
+            Add => self.bin_op_add(x.lhs, x.rhs, x.dst),
+            Sub => self.bin_op_sub(x.lhs, x.rhs, x.dst),
+            Mul => self.bin_op_mul(x.lhs, x.rhs, x.dst),
+            Div => self.bin_op_div(x.lhs, x.rhs, x.dst),
+            Eq => self.bin_op_eq(x.lhs, x.rhs, x.dst),
+            Ne => self.bin_op_ne(x.lhs, x.rhs, x.dst),
+            Lt => self.bin_op_lt(x.lhs, x.rhs, x.dst),
+            Le => self.bin_op_le(x.lhs, x.rhs, x.dst),
+        }
+    }
+
+    fn bin_op_add(&mut self, lhs: usize, rhs: usize, dst: usize) {
+        self.buf += format!("mov eax, {}\n", self.local(lhs));
+        self.buf += format!("mov edi, {}\n", self.local(rhs));
         self.buf += "add rax, rdi\n";
-        self.buf += format!("mov {}, eax\n", self.local(x.dst));
+        self.buf += format!("mov {}, eax\n", self.local(dst));
     }
 
-    fn instr_sub(&mut self, x: tac::InstrSub) {
-        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
-        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
+    fn bin_op_sub(&mut self, lhs: usize, rhs: usize, dst: usize) {
+        self.buf += format!("mov eax, {}\n", self.local(lhs));
+        self.buf += format!("mov edi, {}\n", self.local(rhs));
         self.buf += "sub rax, rdi\n";
-        self.buf += format!("mov {}, eax\n", self.local(x.dst));
+        self.buf += format!("mov {}, eax\n", self.local(dst));
     }
 
-    fn instr_mul(&mut self, x: tac::InstrMul) {
-        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
-        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
+    fn bin_op_mul(&mut self, lhs: usize, rhs: usize, dst: usize) {
+        self.buf += format!("mov eax, {}\n", self.local(lhs));
+        self.buf += format!("mov edi, {}\n", self.local(rhs));
         self.buf += "imul rax, rdi\n";
-        self.buf += format!("mov {}, eax\n", self.local(x.dst));
+        self.buf += format!("mov {}, eax\n", self.local(dst));
     }
 
-    fn instr_div(&mut self, x: tac::InstrDiv) {
-        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
-        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
+    fn bin_op_div(&mut self, lhs: usize, rhs: usize, dst: usize) {
+        self.buf += format!("mov eax, {}\n", self.local(lhs));
+        self.buf += format!("mov edi, {}\n", self.local(rhs));
         self.buf += "cqo\n";
         self.buf += "idiv edi\n";
-        self.buf += format!("mov {}, eax\n", self.local(x.dst));
+        self.buf += format!("mov {}, eax\n", self.local(dst));
+    }
+
+    fn bin_op_eq(&mut self, lhs: usize, rhs: usize, dst: usize) {
+        self.buf += format!("mov edi, {}\n", self.local(rhs));
+        self.buf += format!("mov eax, {}\n", self.local(lhs));
+        self.buf += "cmp eax, edi\n";
+        self.buf += "sete al\n";
+        self.buf += "movzx eax, al\n";
+        self.buf += format!("mov {}, eax\n", self.local(dst));
+    }
+
+    fn bin_op_ne(&mut self, lhs: usize, rhs: usize, dst: usize) {
+        self.buf += format!("mov edi, {}\n", self.local(rhs));
+        self.buf += format!("mov eax, {}\n", self.local(lhs));
+        self.buf += "cmp eax, edi\n";
+        self.buf += "setne al\n";
+        self.buf += "movzx eax, al\n";
+        self.buf += format!("mov {}, eax\n", self.local(dst));
+    }
+
+    fn bin_op_lt(&mut self, lhs: usize, rhs: usize, dst: usize) {
+        self.buf += format!("mov edi, {}\n", self.local(rhs));
+        self.buf += format!("mov eax, {}\n", self.local(lhs));
+        self.buf += "cmp eax, edi\n";
+        self.buf += "setl al\n";
+        self.buf += "movzx eax, al\n";
+        self.buf += format!("mov {}, eax\n", self.local(dst));
+    }
+
+    fn bin_op_le(&mut self, lhs: usize, rhs: usize, dst: usize) {
+        self.buf += format!("mov edi, {}\n", self.local(rhs));
+        self.buf += format!("mov eax, {}\n", self.local(lhs));
+        self.buf += "cmp eax, edi\n";
+        self.buf += "setle al\n";
+        self.buf += "movzx eax, al\n";
+        self.buf += format!("mov {}, eax\n", self.local(dst));
     }
 
     fn instr_neg(&mut self, x: tac::InstrNeg) {
         self.buf += format!("mov eax, {}\n", self.local(x.src));
         self.buf += "neg eax\n";
-        self.buf += format!("mov {}, eax\n", self.local(x.dst));
-    }
-
-    fn instr_eq(&mut self, x: tac::InstrEq) {
-        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
-        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
-        self.buf += "cmp eax, edi\n";
-        self.buf += "sete al\n";
-        self.buf += "movzx eax, al\n";
-        self.buf += format!("mov {}, eax\n", self.local(x.dst));
-    }
-
-    fn instr_ne(&mut self, x: tac::InstrNe) {
-        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
-        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
-        self.buf += "cmp eax, edi\n";
-        self.buf += "setne al\n";
-        self.buf += "movzx eax, al\n";
-        self.buf += format!("mov {}, eax\n", self.local(x.dst));
-    }
-
-    fn instr_lt(&mut self, x: tac::InstrLt) {
-        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
-        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
-        self.buf += "cmp eax, edi\n";
-        self.buf += "setl al\n";
-        self.buf += "movzx eax, al\n";
-        self.buf += format!("mov {}, eax\n", self.local(x.dst));
-    }
-
-    fn instr_le(&mut self, x: tac::InstrLe) {
-        self.buf += format!("mov edi, {}\n", self.local(x.rhs));
-        self.buf += format!("mov eax, {}\n", self.local(x.lhs));
-        self.buf += "cmp eax, edi\n";
-        self.buf += "setle al\n";
-        self.buf += "movzx eax, al\n";
         self.buf += format!("mov {}, eax\n", self.local(x.dst));
     }
 

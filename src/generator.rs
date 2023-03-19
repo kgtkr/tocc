@@ -264,9 +264,7 @@ impl FuncGenerator {
             Return(x) => self.instr_return(x),
             IntConst(x) => self.instr_int_const(x),
             BinOp(x) => self.instr_bin_op(x),
-            Neg(x) => self.instr_neg(x),
-            LocalAddr(x) => self.instr_local_addr(x),
-            Deref(x) => self.instr_deref(x),
+            UnOp(x) => self.instr_un_op(x),
             AssignIndirect(x) => self.instr_assign_indirect(x),
             Label(x) => self.instr_label(x),
             Jump(x) => self.instr_jump(x),
@@ -365,23 +363,32 @@ impl FuncGenerator {
         self.buf += format!("mov {}, eax\n", self.local(dst));
     }
 
-    fn instr_neg(&mut self, x: tac::InstrNeg) {
-        self.buf += format!("mov eax, {}\n", self.local(x.src));
+    fn instr_un_op(&mut self, x: tac::InstrUnOp) {
+        use tac::UnOp::*;
+        match x.op {
+            Neg => self.un_op_neg(x.src, x.dst),
+            LocalAddr => self.un_op_local_addr(x.src, x.dst),
+            Deref => self.un_op_deref(x.src, x.dst),
+        }
+    }
+
+    fn un_op_neg(&mut self, src: usize, dst: usize) {
+        self.buf += format!("mov eax, {}\n", self.local(src));
         self.buf += "neg eax\n";
-        self.buf += format!("mov {}, eax\n", self.local(x.dst));
+        self.buf += format!("mov {}, eax\n", self.local(dst));
     }
 
-    fn instr_local_addr(&mut self, x: tac::InstrLocalAddr) {
-        self.buf += format!("lea rax, {}\n", self.local(x.src));
-        self.buf += format!("mov {}, rax\n", self.local(x.dst));
+    fn un_op_local_addr(&mut self, src: usize, dst: usize) {
+        self.buf += format!("lea rax, {}\n", self.local(src));
+        self.buf += format!("mov {}, rax\n", self.local(dst));
     }
 
-    fn instr_deref(&mut self, x: tac::InstrDeref) {
-        let dst_type = self.locals[x.dst].typ.clone();
+    fn un_op_deref(&mut self, src: usize, dst: usize) {
+        let dst_type = self.locals[dst].typ.clone();
         let ax = Register::Rax.for_bit(dst_type.to_bit());
-        self.buf += format!("mov rax, {}\n", self.local(x.src));
+        self.buf += format!("mov rax, {}\n", self.local(src));
         self.buf += format!("mov {ax}, [rax]\n");
-        self.buf += format!("mov {}, {ax}\n", self.local(x.dst));
+        self.buf += format!("mov {}, {ax}\n", self.local(dst));
     }
 
     fn instr_assign_indirect(&mut self, x: tac::InstrAssignIndirect) {

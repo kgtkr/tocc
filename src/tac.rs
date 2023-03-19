@@ -53,9 +53,7 @@ pub enum Instr {
     Return(InstrReturn),
     IntConst(InstrIntConst),
     BinOp(InstrBinOp),
-    Neg(InstrNeg),
-    LocalAddr(InstrLocalAddr),
-    Deref(InstrDeref),
+    UnOp(InstrUnOp),
     AssignIndirect(InstrAssignIndirect),
     Label(InstrLabel),
     Jump(InstrJump),
@@ -95,21 +93,17 @@ pub struct InstrBinOp {
     pub rhs: usize,
 }
 
-#[derive(Debug, Clone)]
-pub struct InstrNeg {
-    pub dst: usize,
-    pub src: usize,
+#[derive(Debug, Clone, Copy)]
+pub enum UnOp {
+    Neg,
+    LocalAddr,
+    Deref,
 }
 
 #[derive(Debug, Clone)]
-pub struct InstrLocalAddr {
+pub struct InstrUnOp {
     pub dst: usize,
-    pub src: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct InstrDeref {
-    pub dst: usize,
+    pub op: UnOp,
     pub src: usize,
 }
 

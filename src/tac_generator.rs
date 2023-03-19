@@ -373,8 +373,11 @@ impl InstrGenerator {
     fn expr_neg(&mut self, x: clang::ExprNeg) -> Result<usize, CodegenError> {
         let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
         let src = self.expr(*x.expr)?;
-        self.instrs
-            .push(tac::Instr::Neg(tac::InstrNeg { dst, src }));
+        self.instrs.push(tac::Instr::UnOp(tac::InstrUnOp {
+            dst,
+            src,
+            op: tac::UnOp::Neg,
+        }));
         Ok(dst)
     }
 
@@ -382,8 +385,11 @@ impl InstrGenerator {
         let src = self.lvalue(x)?;
         let src_type = self.locals[src].typ.clone();
         let dst = self.generate_local(*src_type.unwrap_ptr().typ);
-        self.instrs
-            .push(tac::Instr::Deref(tac::InstrDeref { dst, src }));
+        self.instrs.push(tac::Instr::UnOp(tac::InstrUnOp {
+            dst,
+            src,
+            op: tac::UnOp::Deref,
+        }));
         Ok(dst)
     }
 
@@ -433,8 +439,11 @@ impl InstrGenerator {
         let dst = self.generate_local(tac::Type::Ptr(tac::TypePtr {
             typ: Box::new(local.typ.clone()),
         }));
-        self.instrs
-            .push(tac::Instr::LocalAddr(tac::InstrLocalAddr { dst, src }));
+        self.instrs.push(tac::Instr::UnOp(tac::InstrUnOp {
+            dst,
+            src,
+            op: tac::UnOp::LocalAddr,
+        }));
         Ok(dst)
     }
 

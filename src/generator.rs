@@ -298,6 +298,8 @@ impl FuncGenerator {
             UnOp(x) => self.instr_un_op(x),
             AssignIndirect(x) => self.instr_assign_indirect(x),
             Call(x) => self.instr_call(x),
+            AssignLocal(x) => self.instr_assign_local(x),
+            Nop => {}
         }
     }
 
@@ -469,6 +471,12 @@ impl FuncGenerator {
         self.buf += format!("call {}\n", x.ident);
         self.buf += format!("add rsp, {}\n", extra_args_size);
         self.buf += format!("mov {}, eax\n", self.local(x.dst));
+    }
+
+    fn instr_assign_local(&mut self, x: tac::InstrAssignLocal) {
+        let ax = Register::Rax.for_bit(self.locals[x.src].typ.to_bit());
+        self.buf += format!("mov {ax}, {}\n", self.local(x.src));
+        self.buf += format!("mov {}, {ax}\n", self.local(x.dst));
     }
 }
 

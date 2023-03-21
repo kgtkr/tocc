@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::Bit;
 use derive_more::Unwrap;
@@ -56,6 +56,16 @@ pub struct BB {
     pub idx: usize,
     pub instrs: Vec<Instr>,
     pub term: BBTerm,
+}
+
+impl BB {
+    pub fn local_usage(&self) -> LocalUsage {
+        let mut usage = self.term.local_usage();
+        for instr in &self.instrs {
+            usage.merge(&instr.local_usage());
+        }
+        usage
+    }
 }
 
 #[derive(Debug, Clone)]

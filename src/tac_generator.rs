@@ -383,7 +383,7 @@ impl InstrGenerator {
         let src = self.expr(rhs)?;
         self.instrs
             .push(tac::Instr::AssignIndirect(tac::InstrAssignIndirect {
-                dst,
+                dst_ref: dst,
                 src,
             }));
         Ok(src)

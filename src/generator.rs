@@ -418,7 +418,7 @@ impl FuncGenerator {
         let src_bit = self.locals[x.src].typ.to_bit();
         let di = Register::Rdi.for_bit(src_bit);
         let src_word = bit_to_word(src_bit);
-        self.buf += format!("mov rax, {}\n", self.local(x.dst));
+        self.buf += format!("mov rax, {}\n", self.local(x.dst_ref));
         self.buf += format!("mov {di}, {}\n", self.local(x.src));
         self.buf += format!("mov {src_word} PTR [rax], {di}\n");
     }

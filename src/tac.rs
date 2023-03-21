@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::Bit;
 use derive_more::Unwrap;
 
@@ -57,6 +59,21 @@ pub struct BB {
 }
 
 #[derive(Debug, Clone)]
+pub struct LocalUsage {
+    pub used: HashSet<usize>,
+    pub defined: HashSet<usize>,
+    pub referenced: HashSet<usize>,
+}
+
+impl LocalUsage {
+    pub fn merge(&mut self, other: &LocalUsage) {
+        self.used.extend(&other.used);
+        self.defined.extend(&other.defined);
+        self.referenced.extend(&other.referenced);
+    }
+}
+
+#[derive(Debug, Clone)]
 // terminator
 pub enum BBTerm {
     Jump {
@@ -76,6 +93,26 @@ impl BBTerm {
     pub fn dummy() -> Self {
         BBTerm::Jump { idx: 0 }
     }
+
+    pub fn local_usage(&self) -> LocalUsage {
+        match self {
+            BBTerm::Jump { .. } => LocalUsage {
+                used: HashSet::new(),
+                defined: HashSet::new(),
+                referenced: HashSet::new(),
+            },
+            BBTerm::JumpIf { cond, .. } => LocalUsage {
+                used: HashSet::from([*cond]),
+                defined: HashSet::new(),
+                referenced: HashSet::new(),
+            },
+            BBTerm::Return { src } => LocalUsage {
+                used: HashSet::from([*src]),
+                defined: HashSet::new(),
+                referenced: HashSet::new(),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -88,6 +125,60 @@ pub enum Instr {
     // AssignIndirectで代用できるが最適化のため
     AssignLocal(InstrAssignLocal),
     Nop,
+}
+
+impl Instr {
+    pub fn local_usage(&self) -> LocalUsage {
+        match self {
+            Instr::IntConst(_) => LocalUsage {
+                used: HashSet::new(),
+                defined: HashSet::new(),
+                referenced: HashSet::new(),
+            },
+            Instr::BinOp(InstrBinOp { lhs, rhs, dst, .. }) => LocalUsage {
+                used: HashSet::from([*lhs, *rhs]),
+                defined: HashSet::from([*dst]),
+                referenced: HashSet::new(),
+            },
+            Instr::UnOp(InstrUnOp { src, dst, op, .. }) => match op {
+                UnOp::LocalAddr => LocalUsage {
+                    used: HashSet::new(),
+                    defined: HashSet::from([*dst]),
+                    referenced: HashSet::from([*src]),
+                },
+                UnOp::Deref => LocalUsage {
+                    used: HashSet::from([*src]),
+                    defined: HashSet::from([*dst]),
+                    referenced: HashSet::new(),
+                },
+                UnOp::Neg => LocalUsage {
+                    used: HashSet::from([*src]),
+                    defined: HashSet::from([*dst]),
+                    referenced: HashSet::new(),
+                },
+            },
+            Instr::AssignIndirect(InstrAssignIndirect { dst_ref, src }) => LocalUsage {
+                used: HashSet::from([*dst_ref, *src]),
+                defined: HashSet::new(),
+                referenced: HashSet::new(),
+            },
+            Instr::Call(InstrCall { args, .. }) => LocalUsage {
+                used: args.iter().copied().collect(),
+                defined: HashSet::new(),
+                referenced: HashSet::new(),
+            },
+            Instr::AssignLocal(InstrAssignLocal { dst, src }) => LocalUsage {
+                used: HashSet::from([*src]),
+                defined: HashSet::from([*dst]),
+                referenced: HashSet::new(),
+            },
+            Instr::Nop => LocalUsage {
+                used: HashSet::new(),
+                defined: HashSet::new(),
+                referenced: HashSet::new(),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -132,7 +223,7 @@ pub struct InstrUnOp {
 
 #[derive(Debug, Clone)]
 pub struct InstrAssignIndirect {
-    pub dst: usize,
+    pub dst_ref: usize,
     pub src: usize,
 }
 
@@ -166,7 +257,7 @@ pub fn optimize(prog: &mut Program) {
                                 }),
                                 Instr::AssignIndirect(InstrAssignIndirect {
                                     src: src2,
-                                    dst: dst2,
+                                    dst_ref: dst2,
                                 }),
                             ) if dst1 == dst2 => {
                                 bb.instrs[i] = Instr::AssignLocal(InstrAssignLocal {

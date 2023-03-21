@@ -261,36 +261,11 @@ impl FuncGenerator {
     fn bb(&mut self, bb: tac::BB) {
         self.buf += format!(".BB.{}.{}:\n", self.func_name, bb.idx);
         for instr in bb.instrs {
-            self.instr(instr);
-        }
-        match bb.term {
-            tac::BBTerm::Jump { idx } => {
-                if idx != bb.idx + 1 {
-                    self.buf += format!("jmp .BB.{}.{}\n", self.func_name, idx);
-                }
-            }
-            tac::BBTerm::JumpIf {
-                cond,
-                then_idx,
-                else_idx,
-            } => {
-                self.buf += format!("mov eax, {}\n", self.local(cond));
-                self.buf += "cmp eax, 0\n";
-                self.buf += format!("je .BB.{}.{}\n", self.func_name, else_idx);
-                if then_idx != bb.idx + 1 {
-                    // 現状の生成コードでは多分unreachable
-                    self.buf += format!("jmp .BB.{}.{}\n", self.func_name, then_idx);
-                }
-            }
-            tac::BBTerm::Return { src } => {
-                self.buf += format!("mov eax, {}\n", self.local(src));
-                self.buf += "leave\n";
-                self.buf += "ret\n";
-            }
+            self.instr(bb.idx, instr);
         }
     }
 
-    fn instr(&mut self, instr: Instr) {
+    fn instr(&mut self, bb_idx: usize, instr: Instr) {
         use Instr::*;
         match instr {
             IntConst(x) => self.instr_int_const(x),
@@ -300,6 +275,7 @@ impl FuncGenerator {
             Call(x) => self.instr_call(x),
             AssignLocal(x) => self.instr_assign_local(x),
             Nop => {}
+            Term(x) => self.instr_term(bb_idx, x),
         }
     }
 
@@ -477,6 +453,34 @@ impl FuncGenerator {
         let ax = Register::Rax.for_bit(self.locals[x.src].typ.to_bit());
         self.buf += format!("mov {ax}, {}\n", self.local(x.src));
         self.buf += format!("mov {}, {ax}\n", self.local(x.dst));
+    }
+
+    fn instr_term(&mut self, bb_idx: usize, x: tac::InstrTerm) {
+        match x {
+            tac::InstrTerm::Jump { idx } => {
+                if idx != bb_idx + 1 {
+                    self.buf += format!("jmp .BB.{}.{}\n", self.func_name, idx);
+                }
+            }
+            tac::InstrTerm::JumpIf {
+                cond,
+                then_idx,
+                else_idx,
+            } => {
+                self.buf += format!("mov eax, {}\n", self.local(cond));
+                self.buf += "cmp eax, 0\n";
+                self.buf += format!("je .BB.{}.{}\n", self.func_name, else_idx);
+                if then_idx != bb_idx + 1 {
+                    // 現状の生成コードでは多分unreachable
+                    self.buf += format!("jmp .BB.{}.{}\n", self.func_name, then_idx);
+                }
+            }
+            tac::InstrTerm::Return { src } => {
+                self.buf += format!("mov eax, {}\n", self.local(src));
+                self.buf += "leave\n";
+                self.buf += "ret\n";
+            }
+        }
     }
 }
 

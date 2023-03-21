@@ -68,13 +68,11 @@ impl InstrGenerator {
         local
     }
 
-    fn new_bb(&mut self, term: tac::BBTerm) -> usize {
+    fn new_bb(&mut self, term: tac::InstrTerm) -> usize {
         let idx = self.bbs.len();
-        self.bbs.push(tac::BB {
-            idx,
-            instrs: mem::take(&mut self.instrs),
-            term,
-        });
+        let mut instrs = mem::take(&mut self.instrs);
+        instrs.push(tac::Instr::Term(term));
+        self.bbs.push(tac::BB { idx, instrs });
         idx
     }
 
@@ -102,7 +100,7 @@ impl InstrGenerator {
 
     fn stmt_return(&mut self, x: StmtReturn) -> Result<(), CodegenError> {
         let src = self.expr(x.expr)?;
-        self.new_bb(tac::BBTerm::Return { src });
+        self.new_bb(tac::InstrTerm::Return { src });
         Ok(())
     }
 
@@ -122,50 +120,50 @@ impl InstrGenerator {
 
     fn stmt_if(&mut self, x: StmtIf) -> Result<(), CodegenError> {
         let cond = self.expr(x.cond.clone())?;
-        let cond_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+        let cond_dummy_bb_idx = self.new_bb(tac::InstrTerm::dummy());
 
         let then_bb_idx = self.bbs.len();
         self.stmt(*x.then)?;
-        let then_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+        let then_dummy_bb_idx = self.new_bb(tac::InstrTerm::dummy());
 
         let else_bb_idx = self.bbs.len();
         if let Some(else_) = x.else_ {
             self.stmt(*else_)?;
         }
-        let else_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+        let else_dummy_bb_idx = self.new_bb(tac::InstrTerm::dummy());
         let next_bb_idx = self.bbs.len();
 
-        self.bbs[cond_dummy_bb_idx].term = tac::BBTerm::JumpIf {
+        *self.bbs[cond_dummy_bb_idx].term_mut() = tac::InstrTerm::JumpIf {
             cond,
             then_idx: then_bb_idx,
             else_idx: else_bb_idx,
         };
-        self.bbs[then_dummy_bb_idx].term = tac::BBTerm::Jump { idx: next_bb_idx };
-        self.bbs[else_dummy_bb_idx].term = tac::BBTerm::Jump { idx: next_bb_idx };
+        *self.bbs[then_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump { idx: next_bb_idx };
+        *self.bbs[else_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump { idx: next_bb_idx };
 
         Ok(())
     }
 
     fn stmt_while(&mut self, x: clang::StmtWhile) -> Result<(), CodegenError> {
-        let start_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+        let start_dummy_bb_idx = self.new_bb(tac::InstrTerm::dummy());
 
         let cond_bb_idx = self.bbs.len();
         let cond = self.expr(x.cond.clone())?;
-        let cond_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+        let cond_dummy_bb_idx = self.new_bb(tac::InstrTerm::dummy());
 
         let body_bb_idx = self.bbs.len();
         self.stmt(*x.body)?;
-        let body_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+        let body_dummy_bb_idx = self.new_bb(tac::InstrTerm::dummy());
 
         let next_bb_idx = self.bbs.len();
 
-        self.bbs[start_dummy_bb_idx].term = tac::BBTerm::Jump { idx: cond_bb_idx };
-        self.bbs[cond_dummy_bb_idx].term = tac::BBTerm::JumpIf {
+        *self.bbs[start_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump { idx: cond_bb_idx };
+        *self.bbs[cond_dummy_bb_idx].term_mut() = tac::InstrTerm::JumpIf {
             cond,
             then_idx: body_bb_idx,
             else_idx: next_bb_idx,
         };
-        self.bbs[body_dummy_bb_idx].term = tac::BBTerm::Jump { idx: cond_bb_idx };
+        *self.bbs[body_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump { idx: cond_bb_idx };
         Ok(())
     }
 
@@ -173,7 +171,7 @@ impl InstrGenerator {
         if let Some(init) = x.init {
             self.expr(init)?;
         }
-        let start_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+        let start_dummy_bb_idx = self.new_bb(tac::InstrTerm::dummy());
 
         let cond_bb_idx = self.bbs.len();
         let cond = if let Some(cond) = x.cond {
@@ -184,24 +182,24 @@ impl InstrGenerator {
                 .push(tac::Instr::IntConst(tac::InstrIntConst { dst, value: 1 }));
             dst
         };
-        let cond_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+        let cond_dummy_bb_idx = self.new_bb(tac::InstrTerm::dummy());
 
         let body_bb_idx = self.bbs.len();
         self.stmt(*x.body.clone())?;
         if let Some(step) = x.step {
             self.expr(step)?;
         }
-        let body_dummy_bb_idx = self.new_bb(tac::BBTerm::dummy());
+        let body_dummy_bb_idx = self.new_bb(tac::InstrTerm::dummy());
 
         let next_bb_idx = self.bbs.len();
 
-        self.bbs[start_dummy_bb_idx].term = tac::BBTerm::Jump { idx: cond_bb_idx };
-        self.bbs[cond_dummy_bb_idx].term = tac::BBTerm::JumpIf {
+        *self.bbs[start_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump { idx: cond_bb_idx };
+        *self.bbs[cond_dummy_bb_idx].term_mut() = tac::InstrTerm::JumpIf {
             cond,
             then_idx: body_bb_idx,
             else_idx: next_bb_idx,
         };
-        self.bbs[body_dummy_bb_idx].term = tac::BBTerm::Jump { idx: cond_bb_idx };
+        *self.bbs[body_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump { idx: cond_bb_idx };
         Ok(())
     }
 

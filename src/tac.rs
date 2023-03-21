@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::Bit;
 use derive_more::Unwrap;
@@ -54,17 +54,31 @@ pub struct DeclFunc {
 // Basic Block
 pub struct BB {
     pub idx: usize,
+    // Termで終わる
     pub instrs: Vec<Instr>,
-    pub term: BBTerm,
 }
 
 impl BB {
     pub fn local_usage(&self) -> LocalUsage {
-        let mut usage = self.term.local_usage();
+        let mut usage = LocalUsage::new();
         for instr in &self.instrs {
             usage.merge(&instr.local_usage());
         }
         usage
+    }
+
+    pub fn term(&self) -> &InstrTerm {
+        match self.instrs.last() {
+            Some(Instr::Term(term)) => term,
+            _ => panic!("BB does not have a terminator"),
+        }
+    }
+
+    pub fn term_mut(&mut self) -> &mut InstrTerm {
+        match self.instrs.last_mut() {
+            Some(Instr::Term(term)) => term,
+            _ => panic!("BB does not have a terminator"),
+        }
     }
 }
 
@@ -76,6 +90,14 @@ pub struct LocalUsage {
 }
 
 impl LocalUsage {
+    pub fn new() -> Self {
+        LocalUsage {
+            used: HashSet::new(),
+            defined: HashSet::new(),
+            referenced: HashSet::new(),
+        }
+    }
+
     pub fn merge(&mut self, other: &LocalUsage) {
         self.used.extend(&other.used);
         self.defined.extend(&other.defined);
@@ -85,7 +107,7 @@ impl LocalUsage {
 
 #[derive(Debug, Clone)]
 // terminator
-pub enum BBTerm {
+pub enum InstrTerm {
     Jump {
         idx: usize,
     },
@@ -99,29 +121,9 @@ pub enum BBTerm {
     },
 }
 
-impl BBTerm {
+impl InstrTerm {
     pub fn dummy() -> Self {
-        BBTerm::Jump { idx: 0 }
-    }
-
-    pub fn local_usage(&self) -> LocalUsage {
-        match self {
-            BBTerm::Jump { .. } => LocalUsage {
-                used: HashSet::new(),
-                defined: HashSet::new(),
-                referenced: HashSet::new(),
-            },
-            BBTerm::JumpIf { cond, .. } => LocalUsage {
-                used: HashSet::from([*cond]),
-                defined: HashSet::new(),
-                referenced: HashSet::new(),
-            },
-            BBTerm::Return { src } => LocalUsage {
-                used: HashSet::from([*src]),
-                defined: HashSet::new(),
-                referenced: HashSet::new(),
-            },
-        }
+        InstrTerm::Jump { idx: 0 }
     }
 }
 
@@ -134,6 +136,8 @@ pub enum Instr {
     Call(InstrCall),
     // AssignIndirectで代用できるが最適化のため
     AssignLocal(InstrAssignLocal),
+    // 最後に必ず入り、途中に入ることはない
+    Term(InstrTerm),
     Nop,
 }
 
@@ -186,6 +190,23 @@ impl Instr {
                 used: HashSet::new(),
                 defined: HashSet::new(),
                 referenced: HashSet::new(),
+            },
+            Instr::Term(term) => match term {
+                InstrTerm::Jump { .. } => LocalUsage {
+                    used: HashSet::new(),
+                    defined: HashSet::new(),
+                    referenced: HashSet::new(),
+                },
+                InstrTerm::JumpIf { cond, .. } => LocalUsage {
+                    used: HashSet::from([*cond]),
+                    defined: HashSet::new(),
+                    referenced: HashSet::new(),
+                },
+                InstrTerm::Return { src } => LocalUsage {
+                    used: HashSet::from([*src]),
+                    defined: HashSet::new(),
+                    referenced: HashSet::new(),
+                },
             },
         }
     }

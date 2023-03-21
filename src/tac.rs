@@ -62,7 +62,10 @@ impl BB {
     pub fn local_usage(&self) -> LocalUsage {
         let mut usage = LocalUsage::new();
         for instr in &self.instrs {
-            usage.merge(&instr.local_usage());
+            let mut instr_usage = instr.local_usage();
+            // 基本ブロック内でkillされている変数はブロック全体のgenに含めない
+            instr_usage.gen.retain(|x| !usage.kill.contains(x));
+            usage.merge(&instr_usage);
         }
         usage
     }
@@ -84,23 +87,23 @@ impl BB {
 
 #[derive(Debug, Clone)]
 pub struct LocalUsage {
-    pub used: HashSet<usize>,
-    pub defined: HashSet<usize>,
+    pub gen: HashSet<usize>,
+    pub kill: HashSet<usize>,
     pub referenced: HashSet<usize>,
 }
 
 impl LocalUsage {
     pub fn new() -> Self {
         LocalUsage {
-            used: HashSet::new(),
-            defined: HashSet::new(),
+            gen: HashSet::new(),
+            kill: HashSet::new(),
             referenced: HashSet::new(),
         }
     }
 
     pub fn merge(&mut self, other: &LocalUsage) {
-        self.used.extend(&other.used);
-        self.defined.extend(&other.defined);
+        self.gen.extend(&other.gen);
+        self.kill.extend(&other.kill);
         self.referenced.extend(&other.referenced);
     }
 }
@@ -125,6 +128,16 @@ impl InstrTerm {
     pub fn dummy() -> Self {
         InstrTerm::Jump { idx: 0 }
     }
+
+    pub fn nexts(&self) -> Vec<usize> {
+        match self {
+            InstrTerm::Jump { idx } => vec![*idx],
+            InstrTerm::JumpIf {
+                then_idx, else_idx, ..
+            } => vec![*then_idx, *else_idx],
+            InstrTerm::Return { .. } => vec![],
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -145,66 +158,66 @@ impl Instr {
     pub fn local_usage(&self) -> LocalUsage {
         match self {
             Instr::IntConst(_) => LocalUsage {
-                used: HashSet::new(),
-                defined: HashSet::new(),
+                gen: HashSet::new(),
+                kill: HashSet::new(),
                 referenced: HashSet::new(),
             },
             Instr::BinOp(InstrBinOp { lhs, rhs, dst, .. }) => LocalUsage {
-                used: HashSet::from([*lhs, *rhs]),
-                defined: HashSet::from([*dst]),
+                gen: HashSet::from([*lhs, *rhs]),
+                kill: HashSet::from([*dst]),
                 referenced: HashSet::new(),
             },
             Instr::UnOp(InstrUnOp { src, dst, op, .. }) => match op {
                 UnOp::LocalAddr => LocalUsage {
-                    used: HashSet::new(),
-                    defined: HashSet::from([*dst]),
+                    gen: HashSet::new(),
+                    kill: HashSet::from([*dst]),
                     referenced: HashSet::from([*src]),
                 },
                 UnOp::Deref => LocalUsage {
-                    used: HashSet::from([*src]),
-                    defined: HashSet::from([*dst]),
+                    gen: HashSet::from([*src]),
+                    kill: HashSet::from([*dst]),
                     referenced: HashSet::new(),
                 },
                 UnOp::Neg => LocalUsage {
-                    used: HashSet::from([*src]),
-                    defined: HashSet::from([*dst]),
+                    gen: HashSet::from([*src]),
+                    kill: HashSet::from([*dst]),
                     referenced: HashSet::new(),
                 },
             },
             Instr::AssignIndirect(InstrAssignIndirect { dst_ref, src }) => LocalUsage {
-                used: HashSet::from([*dst_ref, *src]),
-                defined: HashSet::new(),
+                gen: HashSet::from([*dst_ref, *src]),
+                kill: HashSet::new(),
                 referenced: HashSet::new(),
             },
             Instr::Call(InstrCall { args, .. }) => LocalUsage {
-                used: args.iter().copied().collect(),
-                defined: HashSet::new(),
+                gen: args.iter().copied().collect(),
+                kill: HashSet::new(),
                 referenced: HashSet::new(),
             },
             Instr::AssignLocal(InstrAssignLocal { dst, src }) => LocalUsage {
-                used: HashSet::from([*src]),
-                defined: HashSet::from([*dst]),
+                gen: HashSet::from([*src]),
+                kill: HashSet::from([*dst]),
                 referenced: HashSet::new(),
             },
             Instr::Nop => LocalUsage {
-                used: HashSet::new(),
-                defined: HashSet::new(),
+                gen: HashSet::new(),
+                kill: HashSet::new(),
                 referenced: HashSet::new(),
             },
             Instr::Term(term) => match term {
                 InstrTerm::Jump { .. } => LocalUsage {
-                    used: HashSet::new(),
-                    defined: HashSet::new(),
+                    gen: HashSet::new(),
+                    kill: HashSet::new(),
                     referenced: HashSet::new(),
                 },
                 InstrTerm::JumpIf { cond, .. } => LocalUsage {
-                    used: HashSet::from([*cond]),
-                    defined: HashSet::new(),
+                    gen: HashSet::from([*cond]),
+                    kill: HashSet::new(),
                     referenced: HashSet::new(),
                 },
                 InstrTerm::Return { src } => LocalUsage {
-                    used: HashSet::from([*src]),
-                    defined: HashSet::new(),
+                    gen: HashSet::from([*src]),
+                    kill: HashSet::new(),
                     referenced: HashSet::new(),
                 },
             },
@@ -298,6 +311,49 @@ pub fn optimize(prog: &mut Program) {
                                 bb.instrs[i + 1] = Instr::Nop;
                             }
                             _ => {}
+                        }
+                    }
+                }
+
+                let usages = decl
+                    .bbs
+                    .iter()
+                    .map(|bb| bb.local_usage())
+                    .collect::<Vec<_>>();
+                let mut in_ = vec![HashSet::new(); decl.bbs.len()];
+                let mut out = vec![HashSet::new(); decl.bbs.len()];
+                let mut succs = vec![HashSet::new(); decl.bbs.len()];
+                for bb in &decl.bbs {
+                    for next in bb.term().nexts() {
+                        succs[next].insert(bb.idx);
+                    }
+                }
+
+                let mut changed = true;
+                while changed {
+                    changed = false;
+                    // TODO: 半トポロジカルソートして逆順にすると早くなる
+                    for bb in &decl.bbs {
+                        let prev_in = in_[bb.idx].clone();
+                        let prev_out = out[bb.idx].clone();
+
+                        for succ in &succs[bb.idx] {
+                            out[bb.idx] = out[bb.idx].union(&in_[*succ]).copied().collect();
+                        }
+
+                        in_[bb.idx] = usages[bb.idx]
+                            .gen
+                            .union(
+                                &out[bb.idx]
+                                    .difference(&usages[bb.idx].kill)
+                                    .copied()
+                                    .collect(),
+                            )
+                            .copied()
+                            .collect();
+
+                        if prev_in != in_[bb.idx] || prev_out != out[bb.idx] {
+                            changed = true;
                         }
                     }
                 }

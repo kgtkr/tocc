@@ -491,8 +491,8 @@ pub fn optimize(prog: &mut Program) {
                                 active_end
                             });
 
-                        if let Some((&spill_local)) = spill {
-                            let reg = *local2reg.get(&spill_local).unwrap();
+                        if let Some(&spill_local) = spill {
+                            let reg = local2reg.remove(&spill_local).unwrap();
                             active.remove(&spill_local);
                             active.insert(local_idx);
                             local2reg.insert(local_idx, reg);

@@ -493,19 +493,23 @@ pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
             match decl {
                 Func(x) => {
                     let mut gen = InstrGenerator::new();
-                    for param in &x.params {
-                        gen.add_named_local(
+                    for (idx, param) in x.params.iter().enumerate() {
+                        let arg = gen.add_named_local(
                             param.ident.clone(),
                             &param.ident_loc,
                             tac::Type::Int(tac::TypeInt {}),
                         )?;
+                        gen.instrs
+                            .push(tac::Instr::SetArg(tac::InstrSetArg { dst: arg, idx }));
                     }
                     gen.stmt_compound(x.body)?;
+                    let entry = gen.bbs[0].id;
                     Ok(tac::Decl::Func(tac::DeclFunc {
                         ident: x.ident,
                         args_count: x.params.len(),
                         locals: gen.locals,
                         bbs: gen.bbs,
+                        entry,
                     }))
                 }
             }

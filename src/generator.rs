@@ -216,29 +216,8 @@ impl FuncGenerator {
             16 - stack_size % 16
         };
         self.buf += format!("sub rsp, {}\n", locals_size + locals_pad);
-        if func.args_count >= 1 {
-            self.buf += format!("mov {}, edi\n", self.local(0));
-        }
-        if func.args_count >= 2 {
-            self.buf += format!("mov {}, esi\n", self.local(1));
-        }
-        if func.args_count >= 3 {
-            self.buf += format!("mov {}, edx\n", self.local(2));
-        }
-        if func.args_count >= 4 {
-            self.buf += format!("mov {}, ecx\n", self.local(3));
-        }
-        if func.args_count >= 5 {
-            self.buf += format!("mov {}, r8d\n", self.local(4));
-        }
-        if func.args_count >= 6 {
-            self.buf += format!("mov {}, r9d\n", self.local(5));
-        }
-        if func.args_count >= 7 {
-            for i in 0..(func.args_count - 6) {
-                self.buf += format!("mov eax, DWORD PTR [rbp+{}]\n", 4 * i + 16);
-                self.buf += format!("mov {}, eax\n", self.local(6 + i),);
-            }
+        if func.bbs[0].id != func.entry {
+            self.buf += format!("jmp .BB.{}.{}\n", self.func_name, usize::from(func.entry));
         }
         for bb in func.bbs {
             self.bb(bb);
@@ -276,6 +255,7 @@ impl FuncGenerator {
             AssignLocal(x) => self.instr_assign_local(x),
             Nop => {}
             Term(x) => self.instr_term(x),
+            SetArg(x) => self.instr_set_arg(x),
         }
     }
 
@@ -476,6 +456,21 @@ impl FuncGenerator {
                 self.buf += format!("mov eax, {}\n", self.local(src));
                 self.buf += "leave\n";
                 self.buf += "ret\n";
+            }
+        }
+    }
+
+    fn instr_set_arg(&mut self, x: tac::InstrSetArg) {
+        match x.idx {
+            0 => self.buf += format!("mov {}, edi\n", self.local(x.dst)),
+            1 => self.buf += format!("mov {}, esi\n", self.local(x.dst)),
+            2 => self.buf += format!("mov {}, edx\n", self.local(x.dst)),
+            3 => self.buf += format!("mov {}, ecx\n", self.local(x.dst)),
+            4 => self.buf += format!("mov {}, r8d\n", self.local(x.dst)),
+            5 => self.buf += format!("mov {}, r9d\n", self.local(x.dst)),
+            idx => {
+                self.buf += format!("mov eax, DWORD PTR [rbp+{}]\n", (idx - 6) * 4 + 16);
+                self.buf += format!("mov {}, eax\n", self.local(x.dst));
             }
         }
     }

@@ -50,7 +50,8 @@ pub struct DeclFunc {
     // localsの先頭args_countに引数が入る
     pub args_count: usize,
     pub locals: Vec<Local>,
-    pub bbs: Vec<BB>, // id順ではなく"適切な"順序で並んでいる場合がある
+    pub bbs: Vec<BB>, // id順ではなく"適切な"順序で並んでいる場合がある。非空(少なくともreturn文があるため)
+    pub entry: BBId,
 }
 
 #[derive(Debug, Clone)]
@@ -154,6 +155,8 @@ pub enum Instr {
     AssignLocal(InstrAssignLocal),
     // 最後に必ず入り、途中に入ることはない
     Term(InstrTerm),
+    // entry BBの最初でのみ利用可能
+    SetArg(InstrSetArg),
     Nop,
 }
 
@@ -224,6 +227,11 @@ impl Instr {
                     referenced: HashSet::new(),
                 },
             },
+            Instr::SetArg(InstrSetArg { dst, .. }) => LocalUsage {
+                gen: HashSet::new(),
+                kill: HashSet::from([*dst]),
+                referenced: HashSet::new(),
+            },
         }
     }
 }
@@ -285,6 +293,12 @@ pub struct InstrCall {
 pub struct InstrAssignLocal {
     pub dst: usize,
     pub src: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstrSetArg {
+    pub dst: usize,
+    pub idx: usize,
 }
 
 pub fn optimize(prog: &mut Program) {

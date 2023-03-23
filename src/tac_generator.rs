@@ -7,7 +7,7 @@ use crate::clang::{
     StmtReturn, StmtVarDecl, Type,
 };
 use crate::loc::{Loc, Locatable};
-use crate::tac;
+use crate::tac::{self, BBId};
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
@@ -72,7 +72,10 @@ impl InstrGenerator {
         let idx = self.bbs.len();
         let mut instrs = mem::take(&mut self.instrs);
         instrs.push(tac::Instr::Term(term));
-        self.bbs.push(tac::BB { idx, instrs });
+        self.bbs.push(tac::BB {
+            id: BBId::from(idx),
+            instrs,
+        });
         idx
     }
 
@@ -135,11 +138,15 @@ impl InstrGenerator {
 
         *self.bbs[cond_dummy_bb_idx].term_mut() = tac::InstrTerm::JumpIf {
             cond,
-            then_idx: then_bb_idx,
-            else_idx: else_bb_idx,
+            then_id: BBId::from(then_bb_idx),
+            else_id: BBId::from(else_bb_idx),
         };
-        *self.bbs[then_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump { idx: next_bb_idx };
-        *self.bbs[else_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump { idx: next_bb_idx };
+        *self.bbs[then_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump {
+            id: BBId::from(next_bb_idx),
+        };
+        *self.bbs[else_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump {
+            id: BBId::from(next_bb_idx),
+        };
 
         Ok(())
     }
@@ -157,13 +164,17 @@ impl InstrGenerator {
 
         let next_bb_idx = self.bbs.len();
 
-        *self.bbs[start_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump { idx: cond_bb_idx };
+        *self.bbs[start_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump {
+            id: BBId::from(cond_bb_idx),
+        };
         *self.bbs[cond_dummy_bb_idx].term_mut() = tac::InstrTerm::JumpIf {
             cond,
-            then_idx: body_bb_idx,
-            else_idx: next_bb_idx,
+            then_id: BBId::from(body_bb_idx),
+            else_id: BBId::from(next_bb_idx),
         };
-        *self.bbs[body_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump { idx: cond_bb_idx };
+        *self.bbs[body_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump {
+            id: BBId::from(cond_bb_idx),
+        };
         Ok(())
     }
 
@@ -193,13 +204,17 @@ impl InstrGenerator {
 
         let next_bb_idx = self.bbs.len();
 
-        *self.bbs[start_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump { idx: cond_bb_idx };
+        *self.bbs[start_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump {
+            id: BBId::from(cond_bb_idx),
+        };
         *self.bbs[cond_dummy_bb_idx].term_mut() = tac::InstrTerm::JumpIf {
             cond,
-            then_idx: body_bb_idx,
-            else_idx: next_bb_idx,
+            then_id: BBId::from(body_bb_idx),
+            else_id: BBId::from(next_bb_idx),
         };
-        *self.bbs[body_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump { idx: cond_bb_idx };
+        *self.bbs[body_dummy_bb_idx].term_mut() = tac::InstrTerm::Jump {
+            id: BBId::from(cond_bb_idx),
+        };
         Ok(())
     }
 

@@ -259,13 +259,13 @@ impl FuncGenerator {
     }
 
     fn bb(&mut self, bb: tac::BB) {
-        self.buf += format!(".BB.{}.{}:\n", self.func_name, bb.idx);
+        self.buf += format!(".BB.{}.{}:\n", self.func_name, usize::from(bb.id));
         for instr in bb.instrs {
-            self.instr(bb.idx, instr);
+            self.instr(instr);
         }
     }
 
-    fn instr(&mut self, bb_idx: usize, instr: Instr) {
+    fn instr(&mut self, instr: Instr) {
         use Instr::*;
         match instr {
             IntConst(x) => self.instr_int_const(x),
@@ -275,7 +275,7 @@ impl FuncGenerator {
             Call(x) => self.instr_call(x),
             AssignLocal(x) => self.instr_assign_local(x),
             Nop => {}
-            Term(x) => self.instr_term(bb_idx, x),
+            Term(x) => self.instr_term(x),
         }
     }
 
@@ -455,25 +455,22 @@ impl FuncGenerator {
         self.buf += format!("mov {}, {ax}\n", self.local(x.dst));
     }
 
-    fn instr_term(&mut self, bb_idx: usize, x: tac::InstrTerm) {
+    fn instr_term(&mut self, x: tac::InstrTerm) {
         match x {
-            tac::InstrTerm::Jump { idx } => {
-                if idx != bb_idx + 1 {
-                    self.buf += format!("jmp .BB.{}.{}\n", self.func_name, idx);
-                }
+            tac::InstrTerm::Jump { id } => {
+                // TODO: idが次のBBなら省略
+                self.buf += format!("jmp .BB.{}.{}\n", self.func_name, usize::from(id));
             }
             tac::InstrTerm::JumpIf {
                 cond,
-                then_idx,
-                else_idx,
+                then_id,
+                else_id,
             } => {
                 self.buf += format!("mov eax, {}\n", self.local(cond));
                 self.buf += "cmp eax, 0\n";
-                self.buf += format!("je .BB.{}.{}\n", self.func_name, else_idx);
-                if then_idx != bb_idx + 1 {
-                    // 現状の生成コードでは多分unreachable
-                    self.buf += format!("jmp .BB.{}.{}\n", self.func_name, then_idx);
-                }
+                self.buf += format!("je .BB.{}.{}\n", self.func_name, usize::from(else_id));
+                // TODO: then_idが次のBBなら省略
+                self.buf += format!("jmp .BB.{}.{}\n", self.func_name, usize::from(then_id));
             }
             tac::InstrTerm::Return { src } => {
                 self.buf += format!("mov eax, {}\n", self.local(src));

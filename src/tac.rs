@@ -1,7 +1,10 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::Bit;
-use derive_more::Unwrap;
+use derive_more::{From, Into, Unwrap};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Into, From)]
+pub struct BBId(usize);
 
 #[derive(Debug, Clone, Unwrap)]
 pub enum Type {
@@ -47,13 +50,13 @@ pub struct DeclFunc {
     // localsの先頭args_countに引数が入る
     pub args_count: usize,
     pub locals: Vec<Local>,
-    pub bbs: Vec<BB>,
+    pub bbs: Vec<BB>, // id順ではなく"適切な"順序で並んでいる場合がある
 }
 
 #[derive(Debug, Clone)]
 // Basic Block
 pub struct BB {
-    pub idx: usize,
+    pub id: BBId,
     // Termで終わる
     pub instrs: Vec<Instr>,
 }
@@ -112,12 +115,12 @@ impl LocalUsage {
 // terminator
 pub enum InstrTerm {
     Jump {
-        idx: usize,
+        id: BBId,
     },
     JumpIf {
         cond: usize,
-        then_idx: usize,
-        else_idx: usize,
+        then_id: BBId,
+        else_id: BBId,
     },
     Return {
         src: usize,
@@ -126,15 +129,15 @@ pub enum InstrTerm {
 
 impl InstrTerm {
     pub fn dummy() -> Self {
-        InstrTerm::Jump { idx: 0 }
+        InstrTerm::Jump { id: BBId::from(0) }
     }
 
-    pub fn nexts(&self) -> Vec<usize> {
+    pub fn nexts(&self) -> Vec<BBId> {
         match self {
-            InstrTerm::Jump { idx } => vec![*idx],
+            InstrTerm::Jump { id } => vec![*id],
             InstrTerm::JumpIf {
-                then_idx, else_idx, ..
-            } => vec![*then_idx, *else_idx],
+                then_id, else_id, ..
+            } => vec![*then_id, *else_id],
             InstrTerm::Return { .. } => vec![],
         }
     }
@@ -318,14 +321,26 @@ pub fn optimize(prog: &mut Program) {
                 let usages = decl
                     .bbs
                     .iter()
-                    .map(|bb| bb.local_usage())
-                    .collect::<Vec<_>>();
-                let mut in_ = vec![HashSet::new(); decl.bbs.len()];
-                let mut out = vec![HashSet::new(); decl.bbs.len()];
-                let mut succs = vec![HashSet::new(); decl.bbs.len()];
+                    .map(|bb| (bb.id, bb.local_usage()))
+                    .collect::<HashMap<_, _>>();
+                let mut in_ = decl
+                    .bbs
+                    .iter()
+                    .map(|bb| (bb.id, HashSet::new()))
+                    .collect::<HashMap<_, _>>();
+                let mut out = decl
+                    .bbs
+                    .iter()
+                    .map(|bb| (bb.id, HashSet::new()))
+                    .collect::<HashMap<_, _>>();
+                let mut succs = decl
+                    .bbs
+                    .iter()
+                    .map(|bb| (bb.id, HashSet::new()))
+                    .collect::<HashMap<_, _>>();
                 for bb in &decl.bbs {
                     for next in bb.term().nexts() {
-                        succs[next].insert(bb.idx);
+                        succs.get_mut(&next).unwrap().insert(bb.id);
                     }
                 }
 
@@ -334,25 +349,26 @@ pub fn optimize(prog: &mut Program) {
                     changed = false;
                     // TODO: 半トポロジカルソートして逆順にすると早くなる
                     for bb in &decl.bbs {
-                        let prev_in = in_[bb.idx].clone();
-                        let prev_out = out[bb.idx].clone();
+                        let prev_in = in_[&bb.id].clone();
+                        let prev_out = out[&bb.id].clone();
 
-                        for succ in &succs[bb.idx] {
-                            out[bb.idx] = out[bb.idx].union(&in_[*succ]).copied().collect();
+                        for succ in &succs[&bb.id] {
+                            *out.get_mut(&bb.id).unwrap() =
+                                out[&bb.id].union(&in_[succ]).copied().collect();
                         }
 
-                        in_[bb.idx] = usages[bb.idx]
+                        *in_.get_mut(&bb.id).unwrap() = usages[&bb.id]
                             .gen
                             .union(
-                                &out[bb.idx]
-                                    .difference(&usages[bb.idx].kill)
+                                &out[&bb.id]
+                                    .difference(&usages[&bb.id].kill)
                                     .copied()
                                     .collect(),
                             )
                             .copied()
                             .collect();
 
-                        if prev_in != in_[bb.idx] || prev_out != out[bb.idx] {
+                        if prev_in != in_[&bb.id] || prev_out != out[&bb.id] {
                             changed = true;
                         }
                     }

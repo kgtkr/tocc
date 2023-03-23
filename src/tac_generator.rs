@@ -392,14 +392,29 @@ impl InstrGenerator {
                 message: "expected lvalue".to_string(),
             });
         };
-        let dst = self.lvalue(lvalue)?;
-        let src = self.expr(rhs)?;
-        self.instrs
-            .push(tac::Instr::AssignIndirect(tac::InstrAssignIndirect {
-                dst_ref: dst,
-                src,
-            }));
-        Ok(src)
+        if let clang::ExprLValue::Var(var) = lvalue {
+            // TODO: 本当はこの分岐なしで後から最適化したいが現状の仕組みでは難しいのでいったん
+            let src = self.expr(rhs)?;
+            let dst = *self
+                .local_idents
+                .get(&var.ident)
+                .ok_or_else(|| CodegenError {
+                    loc: var.ident_loc.clone(),
+                    message: format!("undeclared variable `{}`", var.ident),
+                })?;
+            self.instrs
+                .push(tac::Instr::AssignLocal(tac::InstrAssignLocal { dst, src }));
+            Ok(src)
+        } else {
+            let dst = self.lvalue(lvalue)?;
+            let src = self.expr(rhs)?;
+            self.instrs
+                .push(tac::Instr::AssignIndirect(tac::InstrAssignIndirect {
+                    dst_ref: dst,
+                    src,
+                }));
+            Ok(src)
+        }
     }
 
     fn expr_neg(&mut self, x: clang::ExprNeg) -> Result<usize, CodegenError> {

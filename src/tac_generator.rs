@@ -429,15 +429,27 @@ impl InstrGenerator {
     }
 
     fn expr_lvalue(&mut self, x: clang::ExprLValue) -> Result<usize, CodegenError> {
-        let src = self.lvalue(x)?;
-        let src_type = self.locals[src].typ.clone();
-        let dst = self.generate_local(*src_type.unwrap_ptr().typ);
-        self.instrs.push(tac::Instr::UnOp(tac::InstrUnOp {
-            dst,
-            src,
-            op: tac::UnOp::Deref,
-        }));
-        Ok(dst)
+        if let clang::ExprLValue::Var(var) = x {
+            // TODO: 本当はこの分岐なしで後から最適化したいが現状の仕組みでは難しいのでいったん
+            let dst = *self
+                .local_idents
+                .get(&var.ident)
+                .ok_or_else(|| CodegenError {
+                    loc: var.ident_loc.clone(),
+                    message: format!("undeclared variable `{}`", var.ident),
+                })?;
+            Ok(dst)
+        } else {
+            let src = self.lvalue(x)?;
+            let src_type = self.locals[src].typ.clone();
+            let dst = self.generate_local(*src_type.unwrap_ptr().typ);
+            self.instrs.push(tac::Instr::UnOp(tac::InstrUnOp {
+                dst,
+                src,
+                op: tac::UnOp::Deref,
+            }));
+            Ok(dst)
+        }
     }
 
     fn expr_call(&mut self, x: clang::ExprCall) -> Result<usize, CodegenError> {

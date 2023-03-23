@@ -125,6 +125,19 @@ impl Register {
             },
         }
     }
+
+    fn from_id(id: usize) -> Register {
+        match id {
+            0 => Register::Rbx,
+            1 => Register::R10,
+            2 => Register::R11,
+            3 => Register::R12,
+            4 => Register::R13,
+            5 => Register::R14,
+            6 => Register::R15,
+            _ => panic!("unexpected register id: {}", id),
+        }
+    }
 }
 
 fn bit_to_word(bit: Bit) -> &'static str {
@@ -173,7 +186,7 @@ impl Generator {
 #[derive(Debug)]
 pub struct FuncGenerator {
     buf: Buf,
-    local_offsets: Vec<usize>,
+    local_offsets: Vec<Option<usize>>,
     locals: Vec<tac::Local>,
     func_name: String,
 }
@@ -184,8 +197,11 @@ impl FuncGenerator {
             .locals
             .iter()
             .scan(0, |acc, local| {
+                if local.reg.is_some() {
+                    return Some(None);
+                }
                 *acc += local.typ.to_bit().to_size();
-                Some(*acc)
+                Some(Some(*acc))
             })
             .collect::<Vec<_>>();
 
@@ -200,22 +216,23 @@ impl FuncGenerator {
     }
 
     fn decl_func(&mut self, func: DeclFunc) {
-        let locals_size = func
+        let spill_locals_size = func
             .locals
             .iter()
+            .filter(|local| local.reg.is_none())
             .map(|local| local.typ.to_bit().to_size())
             .sum::<usize>();
 
         self.buf += format!("{}:\n", func.ident);
         self.buf += "push rbp\n";
         self.buf += "mov rbp, rsp\n";
-        let stack_size = locals_size + 8 /* rbpの分 */;
+        let stack_size = spill_locals_size + 8 /* rbpの分 */;
         let locals_pad = if stack_size % 16 == 0 {
             0
         } else {
             16 - stack_size % 16
         };
-        self.buf += format!("sub rsp, {}\n", locals_size + locals_pad);
+        self.buf += format!("sub rsp, {}\n", spill_locals_size + locals_pad);
         if func.bbs[0].id != func.entry {
             self.buf += format!("jmp .BB.{}.{}\n", self.func_name, usize::from(func.entry));
         }
@@ -225,16 +242,22 @@ impl FuncGenerator {
     }
 
     fn local(&self, local: usize) -> String {
-        format!(
-            "{} PTR [rbp-{}]",
-            match self.locals[local].typ.to_bit() {
-                Bit::Bit8 => "BYTE",
-                Bit::Bit16 => "WORD",
-                Bit::Bit32 => "DWORD",
-                Bit::Bit64 => "QWORD",
-            },
-            self.local_offsets[local]
-        )
+        if let Some(reg) = self.locals[local].reg {
+            return Register::from_id(reg)
+                .for_bit(self.locals[local].typ.to_bit())
+                .to_string();
+        } else {
+            format!(
+                "{} PTR [rbp-{}]",
+                match self.locals[local].typ.to_bit() {
+                    Bit::Bit8 => "BYTE",
+                    Bit::Bit16 => "WORD",
+                    Bit::Bit32 => "DWORD",
+                    Bit::Bit64 => "QWORD",
+                },
+                self.local_offsets[local].unwrap()
+            )
+        }
     }
 
     fn bb(&mut self, bb: tac::BB) {
@@ -380,6 +403,14 @@ impl FuncGenerator {
     }
 
     fn instr_call(&mut self, x: tac::InstrCall) {
+        let mut save_reg_size = 0;
+        for reg_id in &x.save_regs {
+            // TODO: ローカル変数のサイズに合わせてスタック節約するべき
+            let reg = Register::from_id(*reg_id).for_bit(Bit::Bit64);
+            self.buf += format!("push {reg}\n");
+            save_reg_size += 8;
+        }
+
         if let Some(arg) = x.args.get(0) {
             self.buf += format!("mov edi, {}\n", self.local(*arg));
         }
@@ -413,7 +444,7 @@ impl FuncGenerator {
                     // TODO:
                     4)
                 .sum::<usize>();
-            let extra_args_size = extra_args_size + (extra_args_size % 16);
+            let extra_args_size = extra_args_size + ((extra_args_size + save_reg_size) % 16);
             self.buf += format!("sub rsp, {}\n", extra_args_size);
             for (i, arg) in x.args.iter().enumerate().skip(6) {
                 self.buf += format!("mov eax, {}\n", self.local(*arg));
@@ -421,12 +452,17 @@ impl FuncGenerator {
             }
             extra_args_size
         } else {
-            0
+            save_reg_size % 16
         };
 
         self.buf += format!("call {}\n", x.ident);
         self.buf += format!("add rsp, {}\n", extra_args_size);
         self.buf += format!("mov {}, eax\n", self.local(x.dst));
+
+        for reg_id in x.save_regs.iter().rev() {
+            let reg = Register::from_id(*reg_id).for_bit(Bit::Bit64);
+            self.buf += format!("pop {reg}\n");
+        }
     }
 
     fn instr_assign_local(&mut self, x: tac::InstrAssignLocal) {

@@ -64,7 +64,7 @@ impl InstrGenerator {
 
     fn generate_local(&mut self, typ: tac::Type) -> usize {
         let local = self.locals.len();
-        self.locals.push(tac::Local { typ });
+        self.locals.push(tac::Local { typ, reg: None });
         local
     }
 
@@ -436,6 +436,7 @@ impl InstrGenerator {
             dst,
             ident: x.ident,
             args,
+            save_regs: Vec::new(),
         }));
         Ok(dst)
     }

@@ -1,118 +1,8 @@
-use crate::tac::{Func, Instr};
+use crate::tac::{Func, Instr, LocalUsage};
 use std::collections::{HashMap, HashSet};
 
 pub fn reg_alloc(func: &mut Func) {
-    let usages = func
-        .bbs
-        .iter()
-        .map(|bb| (bb.id, bb.local_usage()))
-        .collect::<HashMap<_, _>>();
-    let mut in_ = func
-        .bbs
-        .iter()
-        .map(|bb| (bb.id, HashSet::new()))
-        .collect::<HashMap<_, _>>();
-    let mut out = func
-        .bbs
-        .iter()
-        .map(|bb| (bb.id, HashSet::new()))
-        .collect::<HashMap<_, _>>();
-    let mut succs = func
-        .bbs
-        .iter()
-        .map(|bb| (bb.id, HashSet::new()))
-        .collect::<HashMap<_, _>>();
-    for bb in &func.bbs {
-        for next in bb.term().nexts() {
-            succs.get_mut(&next).unwrap().insert(bb.id);
-        }
-    }
-
-    let mut changed = true;
-    while changed {
-        changed = false;
-        // TODO: 半トポロジカルソートして逆順にすると早くなる
-        for bb in &func.bbs {
-            let prev_in = in_[&bb.id].clone();
-            let prev_out = out[&bb.id].clone();
-
-            for succ in &succs[&bb.id] {
-                *out.get_mut(&bb.id).unwrap() = out[&bb.id].union(&in_[succ]).copied().collect();
-            }
-
-            *in_.get_mut(&bb.id).unwrap() = usages[&bb.id]
-                .gen
-                .union(
-                    &out[&bb.id]
-                        .difference(&usages[&bb.id].kill)
-                        .copied()
-                        .collect(),
-                )
-                .copied()
-                .collect();
-
-            if prev_in != in_[&bb.id] || prev_out != out[&bb.id] {
-                changed = true;
-            }
-        }
-    }
-
-    // (bb_idx, instr_idx)
-    let mut local_live_first_kills = HashMap::new();
-    let mut local_live_last_gens = HashMap::new();
-    let mut use_as_ref = HashSet::new();
-
-    for (bb_idx, bb) in func.bbs.iter().enumerate() {
-        for inputs in in_.get(&bb.id).unwrap() {
-            let point = (bb_idx, 0);
-            let cur = local_live_first_kills.get(inputs).unwrap_or(&point);
-            local_live_first_kills.insert(*inputs, std::cmp::min(*cur, point));
-        }
-
-        for outputs in out.get(&bb.id).unwrap() {
-            let point = (bb_idx, bb.instrs.len() - 1);
-            let cur = local_live_last_gens.get(outputs).unwrap_or(&point);
-            local_live_last_gens.insert(*outputs, std::cmp::max(*cur, point));
-        }
-
-        for (instr_idx, instr) in bb.instrs.iter().enumerate() {
-            let point = (bb_idx, instr_idx);
-            let usage = instr.local_usage();
-            for local in &usage.kill {
-                let cur = local_live_first_kills.get(local).unwrap_or(&point);
-                local_live_first_kills.insert(*local, std::cmp::min(*cur, point));
-            }
-
-            for local in &usage.gen {
-                let cur = local_live_last_gens.get(local).unwrap_or(&point);
-                local_live_last_gens.insert(*local, std::cmp::max(*cur, point));
-            }
-
-            for local in &usage.referenced {
-                use_as_ref.insert(*local);
-            }
-        }
-    }
-
-    let range = (0..func.locals.len())
-        .filter_map(|local_idx| {
-            if use_as_ref.contains(&local_idx) {
-                None
-            } else {
-                let first_kill = local_live_first_kills.get(&local_idx);
-                let last_gen = local_live_last_gens.get(&local_idx);
-                match (first_kill, last_gen) {
-                    (Some(&first_kill), Some(&last_gen)) => {
-                        assert!(first_kill <= last_gen); // TODO: エラー処理。定義より前に参照していたら未定義動作
-                        Some((local_idx, (first_kill, last_gen)))
-                    }
-                    // 未参照変数や未定義変数の扱いめんどくさいのでいったんspill
-                    _ => None,
-                }
-            }
-        })
-        .collect::<HashMap<_, _>>();
-
+    let range = local_live_ranges(func);
     const MAX_REGS: usize = 7;
     let mut active = HashSet::new();
     let mut free = (0..MAX_REGS).collect::<HashSet<_>>();
@@ -170,9 +60,9 @@ pub fn reg_alloc(func: &mut Func) {
         func.locals[*local_idx].reg = Some(*reg);
     }
 
-    for bb_idx in 0..func.bbs.len() {
-        for instr_idx in 0..func.bbs[bb_idx].instrs.len() {
-            if let Instr::Call(instr) = &mut func.bbs[bb_idx].instrs[instr_idx] {
+    for (bb_idx, bb) in func.bbs.iter_mut().enumerate() {
+        for (instr_idx, instr) in bb.instrs.iter_mut().enumerate() {
+            if let Instr::Call(instr) = instr {
                 instr.save_regs = (0..func.locals.len())
                     .filter_map(|local_idx| {
                         let is_live = range
@@ -192,4 +82,137 @@ pub fn reg_alloc(func: &mut Func) {
             }
         }
     }
+}
+
+fn local_live_ranges(func: &Func) -> HashMap<usize, ((usize, usize), (usize, usize))> {
+    let usages = func
+        .bbs
+        .iter()
+        .map(|bb| {
+            (
+                bb.id,
+                bb.instrs
+                    .iter()
+                    .map(|instr| instr.local_usage())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    let bb_usages = usages
+        .iter()
+        .map(|(&bb_id, usages)| {
+            let mut bb_usage = LocalUsage::new();
+            for mut instr_usage in usages.iter().cloned() {
+                // 基本ブロック内で既にkillされている変数はブロック全体のgenに含めない
+                instr_usage.gen.retain(|x| !bb_usage.kill.contains(x));
+                bb_usage.merge(&instr_usage);
+            }
+            (bb_id, bb_usage)
+        })
+        .collect::<HashMap<_, _>>();
+    let mut in_ = func
+        .bbs
+        .iter()
+        .map(|bb| (bb.id, HashSet::new()))
+        .collect::<HashMap<_, _>>();
+    let mut out = func
+        .bbs
+        .iter()
+        .map(|bb| (bb.id, HashSet::new()))
+        .collect::<HashMap<_, _>>();
+    let mut succs = func
+        .bbs
+        .iter()
+        .map(|bb| (bb.id, HashSet::new()))
+        .collect::<HashMap<_, _>>();
+    for bb in &func.bbs {
+        for next in bb.term().nexts() {
+            succs.get_mut(&next).unwrap().insert(bb.id);
+        }
+    }
+
+    let mut changed = true;
+    while changed {
+        changed = false;
+        // TODO: 半トポロジカルソートして逆順にすると早くなる
+        for bb in &func.bbs {
+            let prev_in = in_[&bb.id].clone();
+            let prev_out = out[&bb.id].clone();
+
+            for succ in &succs[&bb.id] {
+                *out.get_mut(&bb.id).unwrap() = out[&bb.id].union(&in_[succ]).copied().collect();
+            }
+
+            *in_.get_mut(&bb.id).unwrap() = bb_usages[&bb.id]
+                .gen
+                .union(
+                    &out[&bb.id]
+                        .difference(&bb_usages[&bb.id].kill)
+                        .copied()
+                        .collect(),
+                )
+                .copied()
+                .collect();
+
+            if prev_in != in_[&bb.id] || prev_out != out[&bb.id] {
+                changed = true;
+            }
+        }
+    }
+
+    // (bb_idx, instr_idx)
+    let mut local_live_first_kills = HashMap::new();
+    let mut local_live_last_gens = HashMap::new();
+    let mut use_as_ref = HashSet::new();
+
+    for (bb_idx, bb) in func.bbs.iter().enumerate() {
+        for inputs in in_.get(&bb.id).unwrap() {
+            let point = (bb_idx, 0);
+            let cur = local_live_first_kills.get(inputs).unwrap_or(&point);
+            local_live_first_kills.insert(*inputs, std::cmp::min(*cur, point));
+        }
+
+        for outputs in out.get(&bb.id).unwrap() {
+            let point = (bb_idx, bb.instrs.len() - 1);
+            let cur = local_live_last_gens.get(outputs).unwrap_or(&point);
+            local_live_last_gens.insert(*outputs, std::cmp::max(*cur, point));
+        }
+
+        for (instr_idx, usage) in usages[&bb.id].iter().enumerate() {
+            let point = (bb_idx, instr_idx);
+            for local in &usage.kill {
+                let cur = local_live_first_kills.get(local).unwrap_or(&point);
+                local_live_first_kills.insert(*local, std::cmp::min(*cur, point));
+            }
+
+            for local in &usage.gen {
+                let cur = local_live_last_gens.get(local).unwrap_or(&point);
+                local_live_last_gens.insert(*local, std::cmp::max(*cur, point));
+            }
+
+            for local in &usage.referenced {
+                use_as_ref.insert(*local);
+            }
+        }
+    }
+
+    let range = (0..func.locals.len())
+        .filter_map(|local_idx| {
+            if use_as_ref.contains(&local_idx) {
+                None
+            } else {
+                let first_kill = local_live_first_kills.get(&local_idx);
+                let last_gen = local_live_last_gens.get(&local_idx);
+                match (first_kill, last_gen) {
+                    (Some(&first_kill), Some(&last_gen)) => {
+                        assert!(first_kill <= last_gen); // TODO: エラー処理。定義より前に参照していたら未定義動作
+                        Some((local_idx, (first_kill, last_gen)))
+                    }
+                    // 未参照変数や未定義変数の扱いめんどくさいのでいったんspill
+                    _ => None,
+                }
+            }
+        })
+        .collect::<HashMap<_, _>>();
+    range
 }

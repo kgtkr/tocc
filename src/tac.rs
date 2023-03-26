@@ -60,17 +60,6 @@ pub struct BB {
 }
 
 impl BB {
-    pub fn local_usage(&self) -> LocalUsage {
-        let mut usage = LocalUsage::new();
-        for instr in &self.instrs {
-            let mut instr_usage = instr.local_usage();
-            // 基本ブロック内でkillされている変数はブロック全体のgenに含めない
-            instr_usage.gen.retain(|x| !usage.kill.contains(x));
-            usage.merge(&instr_usage);
-        }
-        usage
-    }
-
     pub fn term(&self) -> &InstrTerm {
         match self.instrs.last() {
             Some(Instr::Term(term)) => term,

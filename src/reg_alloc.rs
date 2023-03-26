@@ -1,28 +1,28 @@
-use crate::tac::{DeclFunc, Instr};
+use crate::tac::{Func, Instr};
 use std::collections::{HashMap, HashSet};
 
-pub fn reg_alloc(decl: &mut DeclFunc) {
-    let usages = decl
+pub fn reg_alloc(func: &mut Func) {
+    let usages = func
         .bbs
         .iter()
         .map(|bb| (bb.id, bb.local_usage()))
         .collect::<HashMap<_, _>>();
-    let mut in_ = decl
+    let mut in_ = func
         .bbs
         .iter()
         .map(|bb| (bb.id, HashSet::new()))
         .collect::<HashMap<_, _>>();
-    let mut out = decl
+    let mut out = func
         .bbs
         .iter()
         .map(|bb| (bb.id, HashSet::new()))
         .collect::<HashMap<_, _>>();
-    let mut succs = decl
+    let mut succs = func
         .bbs
         .iter()
         .map(|bb| (bb.id, HashSet::new()))
         .collect::<HashMap<_, _>>();
-    for bb in &decl.bbs {
+    for bb in &func.bbs {
         for next in bb.term().nexts() {
             succs.get_mut(&next).unwrap().insert(bb.id);
         }
@@ -32,7 +32,7 @@ pub fn reg_alloc(decl: &mut DeclFunc) {
     while changed {
         changed = false;
         // TODO: 半トポロジカルソートして逆順にすると早くなる
-        for bb in &decl.bbs {
+        for bb in &func.bbs {
             let prev_in = in_[&bb.id].clone();
             let prev_out = out[&bb.id].clone();
 
@@ -62,7 +62,7 @@ pub fn reg_alloc(decl: &mut DeclFunc) {
     let mut local_live_last_gens = HashMap::new();
     let mut use_as_ref = HashSet::new();
 
-    for (bb_idx, bb) in decl.bbs.iter().enumerate() {
+    for (bb_idx, bb) in func.bbs.iter().enumerate() {
         for inputs in in_.get(&bb.id).unwrap() {
             let point = (bb_idx, 0);
             let cur = local_live_first_kills.get(inputs).unwrap_or(&point);
@@ -94,7 +94,7 @@ pub fn reg_alloc(decl: &mut DeclFunc) {
         }
     }
 
-    let range = (0..decl.locals.len())
+    let range = (0..func.locals.len())
         .filter_map(|local_idx| {
             if use_as_ref.contains(&local_idx) {
                 None
@@ -167,13 +167,13 @@ pub fn reg_alloc(decl: &mut DeclFunc) {
     }
 
     for (local_idx, reg) in &local2reg {
-        decl.locals[*local_idx].reg = Some(*reg);
+        func.locals[*local_idx].reg = Some(*reg);
     }
 
-    for bb_idx in 0..decl.bbs.len() {
-        for instr_idx in 0..decl.bbs[bb_idx].instrs.len() {
-            if let Instr::Call(instr) = &mut decl.bbs[bb_idx].instrs[instr_idx] {
-                instr.save_regs = (0..decl.locals.len())
+    for bb_idx in 0..func.bbs.len() {
+        for instr_idx in 0..func.bbs[bb_idx].instrs.len() {
+            if let Instr::Call(instr) = &mut func.bbs[bb_idx].instrs[instr_idx] {
+                instr.save_regs = (0..func.locals.len())
                     .filter_map(|local_idx| {
                         let is_live = range
                             .get(&local_idx)
@@ -183,7 +183,7 @@ pub fn reg_alloc(decl: &mut DeclFunc) {
                             })
                             .unwrap_or(false);
                         if is_live {
-                            decl.locals[local_idx].reg
+                            func.locals[local_idx].reg
                         } else {
                             None
                         }

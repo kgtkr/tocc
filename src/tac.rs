@@ -38,16 +38,11 @@ pub struct Local {
 
 #[derive(Debug, Clone)]
 pub struct Program {
-    pub decls: Vec<Decl>,
+    pub funcs: Vec<Func>,
 }
 
 #[derive(Debug, Clone)]
-pub enum Decl {
-    Func(DeclFunc),
-}
-
-#[derive(Debug, Clone)]
-pub struct DeclFunc {
+pub struct Func {
     pub ident: String,
     // localsの先頭args_countに引数が入る
     pub args_count: usize,
@@ -305,38 +300,34 @@ pub struct InstrSetArg {
 }
 
 pub fn optimize(prog: &mut Program) {
-    for decl in &mut prog.decls {
-        match decl {
-            Decl::Func(decl) => {
-                for bb in &mut decl.bbs {
-                    // AssignIndirect -> AssignLocal
-                    for i in 0..bb.instrs.len().checked_sub(1).unwrap_or(0) {
-                        // TODO: LocalAddrとAssignIndirectが連続して並んでるとは限らないので動かない
-                        match (&bb.instrs[i], &bb.instrs[i + 1]) {
-                            (
-                                Instr::UnOp(InstrUnOp {
-                                    op: UnOp::LocalAddr,
-                                    src: src1,
-                                    dst: dst1,
-                                }),
-                                Instr::AssignIndirect(InstrAssignIndirect {
-                                    src: src2,
-                                    dst_ref: dst2,
-                                }),
-                            ) if dst1 == dst2 => {
-                                bb.instrs[i] = Instr::AssignLocal(InstrAssignLocal {
-                                    dst: *src1,
-                                    src: *src2,
-                                });
-                                bb.instrs[i + 1] = Instr::Nop;
-                            }
-                            _ => {}
-                        }
+    for func in &mut prog.funcs {
+        for bb in &mut func.bbs {
+            // AssignIndirect -> AssignLocal
+            for i in 0..bb.instrs.len().checked_sub(1).unwrap_or(0) {
+                // TODO: LocalAddrとAssignIndirectが連続して並んでるとは限らないので動かない
+                match (&bb.instrs[i], &bb.instrs[i + 1]) {
+                    (
+                        Instr::UnOp(InstrUnOp {
+                            op: UnOp::LocalAddr,
+                            src: src1,
+                            dst: dst1,
+                        }),
+                        Instr::AssignIndirect(InstrAssignIndirect {
+                            src: src2,
+                            dst_ref: dst2,
+                        }),
+                    ) if dst1 == dst2 => {
+                        bb.instrs[i] = Instr::AssignLocal(InstrAssignLocal {
+                            dst: *src1,
+                            src: *src2,
+                        });
+                        bb.instrs[i + 1] = Instr::Nop;
                     }
+                    _ => {}
                 }
-
-                reg_alloc(decl);
             }
         }
+
+        reg_alloc(func);
     }
 }

@@ -1,5 +1,5 @@
 use crate::buf::Buf;
-use crate::tac::{self, Decl, DeclFunc, Instr, Program};
+use crate::tac::{self, Func, Instr, Program};
 use crate::Bit;
 
 #[derive(Debug, Copy, Clone)]
@@ -163,22 +163,13 @@ impl Generator {
     fn program(&mut self, program: Program) {
         self.buf += ".intel_syntax noprefix\n";
         self.buf += ".globl main\n";
-        for decl in program.decls {
-            self.decl(decl);
+        for func in program.funcs {
+            self.func(func);
         }
         self.buf += ".section .note.GNU-stack, \"\", @progbits\n";
     }
 
-    fn decl(&mut self, decl: Decl) {
-        use Decl::*;
-        match decl {
-            Func(x) => {
-                self.decl_func(x);
-            }
-        }
-    }
-
-    fn decl_func(&mut self, x: DeclFunc) {
+    fn func(&mut self, x: Func) {
         self.buf += FuncGenerator::gen(x);
     }
 }
@@ -192,7 +183,7 @@ pub struct FuncGenerator {
 }
 
 impl FuncGenerator {
-    fn gen(func: DeclFunc) -> Buf {
+    fn gen(func: Func) -> Buf {
         let local_offsets = func
             .locals
             .iter()
@@ -211,11 +202,11 @@ impl FuncGenerator {
             locals: func.locals.clone(),
             func_name: func.ident.clone(),
         };
-        gen.decl_func(func);
+        gen.func(func);
         gen.buf
     }
 
-    fn decl_func(&mut self, func: DeclFunc) {
+    fn func(&mut self, func: Func) {
         let spill_locals_size = func
             .locals
             .iter()

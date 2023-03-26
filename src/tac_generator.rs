@@ -513,7 +513,7 @@ impl InstrGenerator {
 }
 
 pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
-    let decls = program
+    let funcs = program
         .decls
         .into_iter()
         .map(|decl| {
@@ -532,17 +532,17 @@ pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
                     }
                     gen.stmt_compound(x.body)?;
                     let entry = gen.bbs[0].id;
-                    Ok(tac::Decl::Func(tac::DeclFunc {
+                    Ok(tac::Func {
                         ident: x.ident,
                         args_count: x.params.len(),
                         locals: gen.locals,
                         bbs: gen.bbs,
                         entry,
-                    }))
+                    })
                 }
             }
         })
         .collect::<Result<Vec<_>, CodegenError>>()?;
 
-    Ok(tac::Program { decls })
+    Ok(tac::Program { funcs })
 }

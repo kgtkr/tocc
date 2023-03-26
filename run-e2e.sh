@@ -26,7 +26,8 @@ check() {
   FAILMSG=$(printf "\e[31mFAIL\e[0m $NAME")
 
   set +e
-  MAKE_RESULT=$(make "$DIR/main.out")
+  # target/debug/tocc は事前にビルドしてあるので無視する(並列実行でエラーが起きるのを回避するため)
+  MAKE_RESULT=$(make -B -o target/debug/tocc "$DIR/main.out")
   if [ "$?" != "0" ]; then
     echo $FAILMSG
     echo "Make failed"
@@ -102,7 +103,7 @@ expr_test() {
 rm -rf fixtures/_expr_test_*
 source fixtures/expr_tests.sh
 
-make target/debug/tocc
+make -B target/debug/tocc
 
 for dir in fixtures/*/
 do

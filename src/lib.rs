@@ -9,3 +9,5 @@ pub mod tac;
 pub mod tac_generator;
 pub mod token;
 pub use bit::Bit;
+mod reg_alloc;
+pub use reg_alloc::reg_alloc;

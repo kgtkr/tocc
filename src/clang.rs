@@ -221,6 +221,19 @@ impl Locatable for Expr {
     }
 }
 
+impl Expr {
+    pub fn id(&self) -> usize {
+        match self {
+            Expr::IntLit(x) => x.id,
+            Expr::BinOp(x) => x.id,
+            Expr::Neg(x) => x.id,
+            Expr::LValue(x) => x.id(),
+            Expr::Call(x) => x.id,
+            Expr::Addr(x) => x.id,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum BinOp {
     Add,
@@ -241,6 +254,7 @@ pub struct ExprBinOp {
     pub op: BinOp,
     pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
+    pub id: usize,
 }
 
 impl Locatable for ExprBinOp {
@@ -264,10 +278,20 @@ impl Locatable for ExprLValue {
     }
 }
 
+impl ExprLValue {
+    pub fn id(&self) -> usize {
+        match self {
+            ExprLValue::Var(x) => x.id,
+            ExprLValue::Deref(x) => x.id,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ExprIntLit {
     pub value: i64,
     pub value_loc: Loc,
+    pub id: usize,
 }
 
 impl Locatable for ExprIntLit {
@@ -280,6 +304,7 @@ impl Locatable for ExprIntLit {
 pub struct ExprNeg {
     pub minus_loc: Loc,
     pub expr: Box<Expr>,
+    pub id: usize,
 }
 
 impl Locatable for ExprNeg {
@@ -292,6 +317,7 @@ impl Locatable for ExprNeg {
 pub struct LValueVar {
     pub ident: String,
     pub ident_loc: Loc,
+    pub id: usize,
 }
 
 impl Locatable for LValueVar {
@@ -304,6 +330,7 @@ impl Locatable for LValueVar {
 pub struct LValueDeref {
     pub star_loc: Loc,
     pub expr: Box<Expr>,
+    pub id: usize,
 }
 
 impl Locatable for LValueDeref {
@@ -317,6 +344,7 @@ pub struct ExprCall {
     pub ident: String,
     pub ident_loc: Loc,
     pub args: Vec<Expr>,
+    pub id: usize,
 }
 
 impl Locatable for ExprCall {
@@ -329,6 +357,7 @@ impl Locatable for ExprCall {
 pub struct ExprAddr {
     pub amp_loc: Loc,
     pub expr: Box<Expr>,
+    pub id: usize,
 }
 
 impl Locatable for ExprAddr {
@@ -341,6 +370,7 @@ impl Locatable for ExprAddr {
 pub struct ExprDeref {
     pub star_loc: Loc,
     pub expr: Box<Expr>,
+    pub id: usize,
 }
 
 impl Locatable for ExprDeref {

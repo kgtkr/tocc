@@ -252,6 +252,7 @@ pub enum BinOp {
 #[derive(Debug, Clone)]
 pub struct ExprBinOp {
     pub op: BinOp,
+    pub op_loc: Loc,
     pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
     pub id: usize,

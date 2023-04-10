@@ -241,8 +241,8 @@ impl InstrGenerator {
 
     fn expr_bin_op(&mut self, x: ExprBinOp) -> Result<usize, CodegenError> {
         match x.op {
-            BinOp::Add => self.bin_op_add(*x.lhs, *x.rhs),
-            BinOp::Sub => self.bin_op_sub(*x.lhs, *x.rhs),
+            BinOp::Add => self.bin_op_add(*x.lhs, *x.rhs, x.op_loc),
+            BinOp::Sub => self.bin_op_sub(*x.lhs, *x.rhs, x.op_loc),
             BinOp::Mul => self.bin_op_mul(*x.lhs, *x.rhs),
             BinOp::Div => self.bin_op_div(*x.lhs, *x.rhs),
             BinOp::Eq => self.bin_op_eq(*x.lhs, *x.rhs),
@@ -255,30 +255,149 @@ impl InstrGenerator {
         }
     }
 
-    fn bin_op_add(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+    fn bin_op_add(&mut self, lhs: Expr, rhs: Expr, op_loc: Loc) -> Result<usize, CodegenError> {
         let lhs = self.expr(lhs)?;
         let rhs = self.expr(rhs)?;
-        self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
-            dst,
-            lhs,
-            rhs,
-            op: tac::BinOp::Add,
-        }));
-        Ok(dst)
+
+        let l_typ = self.locals[lhs].typ.clone();
+        let r_typ = self.locals[rhs].typ.clone();
+        match (l_typ, r_typ) {
+            (tac::Type::Int(_), tac::Type::Int(_)) => {
+                let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+                self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+                    dst,
+                    lhs,
+                    rhs,
+                    op: tac::BinOp::Add,
+                }));
+                Ok(dst)
+            }
+            (tac::Type::Ptr(tac::TypePtr { typ: l_inner_typ }), tac::Type::Int(_)) => {
+                let ptr_inner_size = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+                let add_val = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+                let dst = self.generate_local(tac::Type::Ptr(tac::TypePtr {
+                    typ: l_inner_typ.clone(),
+                }));
+                self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
+                    dst: ptr_inner_size,
+                    value: l_inner_typ.to_bit().to_size() as i64,
+                }));
+                self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+                    dst: add_val,
+                    lhs: rhs,
+                    rhs: ptr_inner_size,
+                    op: tac::BinOp::Mul,
+                }));
+                self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+                    dst,
+                    lhs,
+                    rhs: add_val,
+                    op: tac::BinOp::Add,
+                }));
+                Ok(dst)
+            }
+            (tac::Type::Int(_), tac::Type::Ptr(tac::TypePtr { typ: r_inner_typ })) => {
+                let ptr_inner_size = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+                let add_val = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+                let dst = self.generate_local(tac::Type::Ptr(tac::TypePtr {
+                    typ: r_inner_typ.clone(),
+                }));
+                self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
+                    dst: ptr_inner_size,
+                    value: r_inner_typ.to_bit().to_size() as i64,
+                }));
+                self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+                    dst: add_val,
+                    lhs,
+                    rhs: ptr_inner_size,
+                    op: tac::BinOp::Mul,
+                }));
+                self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+                    dst,
+                    lhs: add_val,
+                    rhs,
+                    op: tac::BinOp::Add,
+                }));
+                Ok(dst)
+            }
+            (_, _) => Err(CodegenError {
+                loc: op_loc,
+                message: "invalid types for add".to_string(), // TODO: better error message
+            }),
+        }
     }
 
-    fn bin_op_sub(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+    fn bin_op_sub(&mut self, lhs: Expr, rhs: Expr, op_loc: Loc) -> Result<usize, CodegenError> {
         let lhs = self.expr(lhs)?;
         let rhs = self.expr(rhs)?;
-        self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
-            dst,
-            lhs,
-            rhs,
-            op: tac::BinOp::Sub,
-        }));
-        Ok(dst)
+
+        let l_typ = self.locals[lhs].typ.clone();
+        let r_typ = self.locals[rhs].typ.clone();
+        match (l_typ, r_typ) {
+            (tac::Type::Int(_), tac::Type::Int(_)) => {
+                let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+                self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+                    dst,
+                    lhs,
+                    rhs,
+                    op: tac::BinOp::Sub,
+                }));
+                Ok(dst)
+            }
+            (tac::Type::Ptr(tac::TypePtr { typ: l_inner_typ }), tac::Type::Int(_)) => {
+                let ptr_inner_size = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+                let add_val = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+                let dst = self.generate_local(tac::Type::Ptr(tac::TypePtr {
+                    typ: l_inner_typ.clone(),
+                }));
+                self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
+                    dst: ptr_inner_size,
+                    value: l_inner_typ.to_bit().to_size() as i64,
+                }));
+                self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+                    dst: add_val,
+                    lhs: rhs,
+                    rhs: ptr_inner_size,
+                    op: tac::BinOp::Mul,
+                }));
+                self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+                    dst,
+                    lhs,
+                    rhs: add_val,
+                    op: tac::BinOp::Sub,
+                }));
+                Ok(dst)
+            }
+            (
+                tac::Type::Ptr(tac::TypePtr { typ: l_inner_typ }),
+                tac::Type::Ptr(tac::TypePtr { typ: r_inner_typ }),
+            ) => {
+                let sub_val = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+                let ptr_inner_size = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+                let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+                self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+                    dst: sub_val,
+                    lhs,
+                    rhs,
+                    op: tac::BinOp::Sub,
+                }));
+                self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
+                    dst: ptr_inner_size,
+                    value: l_inner_typ.to_bit().to_size() as i64,
+                }));
+                self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
+                    dst,
+                    lhs: sub_val,
+                    rhs: ptr_inner_size,
+                    op: tac::BinOp::Div,
+                }));
+                Ok(dst)
+            }
+            (_, _) => Err(CodegenError {
+                loc: op_loc,
+                message: "invalid types for sub".to_string(), // TODO: better error message
+            }),
+        }
     }
 
     fn bin_op_mul(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {

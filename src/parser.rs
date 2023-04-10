@@ -312,29 +312,35 @@ impl Parser {
                 parser_or!(
                     p,
                     |p| {
-                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Asterisk), "*")?;
+                        let op_token = p.satisfy_(
+                            |token| matches!(token.payload, TokenPayload::Asterisk),
+                            "*",
+                        )?;
                         let rhs = p.unary()?;
-                        Ok((Op::Mul, rhs, p.gen_expr_id()))
+                        Ok((Op::Mul, op_token.loc, rhs, p.gen_expr_id()))
                     },
                     |p| {
-                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Slash), "/")?;
+                        let op_token =
+                            p.satisfy_(|token| matches!(token.payload, TokenPayload::Slash), "/")?;
                         let rhs = p.unary()?;
-                        Ok((Op::Div, rhs, p.gen_expr_id()))
+                        Ok((Op::Div, op_token.loc, rhs, p.gen_expr_id()))
                     },
                 )
             },
             expr,
-            |expr, (op, rhs, expr_id)| match op {
+            |expr, (op, op_loc, rhs, expr_id)| match op {
                 Op::Mul => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
                     op: BinOp::Mul,
+                    op_loc,
                     id: expr_id,
                 }),
                 Op::Div => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
                     op: BinOp::Div,
+                    op_loc,
                     id: expr_id,
                 }),
             },
@@ -352,29 +358,33 @@ impl Parser {
                 parser_or!(
                     p,
                     |p| {
-                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Plus), "+")?;
+                        let op_token =
+                            p.satisfy_(|token| matches!(token.payload, TokenPayload::Plus), "+")?;
                         let rhs = p.muldiv()?;
-                        Ok((Op::Add, rhs, p.gen_expr_id()))
+                        Ok((Op::Add, op_token.loc, rhs, p.gen_expr_id()))
                     },
                     |p| {
-                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Minus), "-")?;
+                        let op_token =
+                            p.satisfy_(|token| matches!(token.payload, TokenPayload::Minus), "-")?;
                         let rhs = p.muldiv()?;
-                        Ok((Op::Sub, rhs, p.gen_expr_id()))
+                        Ok((Op::Sub, op_token.loc, rhs, p.gen_expr_id()))
                     },
                 )
             },
             expr,
-            |expr, (op, rhs, expr_id)| match op {
+            |expr, (op, op_loc, rhs, expr_id)| match op {
                 Op::Add => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
                     op: BinOp::Add,
+                    op_loc,
                     id: expr_id,
                 }),
                 Op::Sub => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
                     op: BinOp::Sub,
+                    op_loc,
                     id: expr_id,
                 }),
             },
@@ -394,51 +404,59 @@ impl Parser {
                 parser_or!(
                     p,
                     |p| {
-                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Lt), "<")?;
+                        let op_token =
+                            p.satisfy_(|token| matches!(token.payload, TokenPayload::Lt), "<")?;
                         let rhs = p.addsub()?;
-                        Ok((Op::Lt, rhs, p.gen_expr_id()))
+                        Ok((Op::Lt, op_token.loc, rhs, p.gen_expr_id()))
                     },
                     |p| {
-                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Le), "<=")?;
+                        let op_token =
+                            p.satisfy_(|token| matches!(token.payload, TokenPayload::Le), "<=")?;
                         let rhs = p.addsub()?;
-                        Ok((Op::Le, rhs, p.gen_expr_id()))
+                        Ok((Op::Le, op_token.loc, rhs, p.gen_expr_id()))
                     },
                     |p| {
-                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Gt), ">")?;
+                        let op_token =
+                            p.satisfy_(|token| matches!(token.payload, TokenPayload::Gt), ">")?;
                         let rhs = p.addsub()?;
-                        Ok((Op::Gt, rhs, p.gen_expr_id()))
+                        Ok((Op::Gt, op_token.loc, rhs, p.gen_expr_id()))
                     },
                     |p| {
-                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Ge), ">=")?;
+                        let op_token =
+                            p.satisfy_(|token| matches!(token.payload, TokenPayload::Ge), ">=")?;
                         let rhs = p.addsub()?;
-                        Ok((Op::Ge, rhs, p.gen_expr_id()))
+                        Ok((Op::Ge, op_token.loc, rhs, p.gen_expr_id()))
                     },
                 )
             },
             expr,
-            |expr, (op, rhs, expr_id)| match op {
+            |expr, (op, op_loc, rhs, expr_id)| match op {
                 Op::Lt => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
                     op: BinOp::Lt,
+                    op_loc,
                     id: expr_id,
                 }),
                 Op::Le => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
                     op: BinOp::Le,
+                    op_loc,
                     id: expr_id,
                 }),
                 Op::Gt => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
                     op: BinOp::Gt,
+                    op_loc,
                     id: expr_id,
                 }),
                 Op::Ge => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
                     op: BinOp::Ge,
+                    op_loc,
                     id: expr_id,
                 }),
             },
@@ -456,29 +474,33 @@ impl Parser {
                 parser_or!(
                     p,
                     |p| {
-                        p.satisfy_(|token| matches!(token.payload, TokenPayload::EqEq), "==")?;
+                        let op_token =
+                            p.satisfy_(|token| matches!(token.payload, TokenPayload::EqEq), "==")?;
                         let rhs = p.relational()?;
-                        Ok((Op::Eq, rhs, p.gen_expr_id()))
+                        Ok((Op::Eq, op_token.loc, rhs, p.gen_expr_id()))
                     },
                     |p| {
-                        p.satisfy_(|token| matches!(token.payload, TokenPayload::Neq), "!=")?;
+                        let op_token =
+                            p.satisfy_(|token| matches!(token.payload, TokenPayload::Neq), "!=")?;
                         let rhs = p.relational()?;
-                        Ok((Op::Ne, rhs, p.gen_expr_id()))
+                        Ok((Op::Ne, op_token.loc, rhs, p.gen_expr_id()))
                     },
                 )
             },
             expr,
-            |expr, (op, rhs, expr_id)| match op {
+            |expr, (op, op_loc, rhs, expr_id)| match op {
                 Op::Eq => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
                     op: BinOp::Eq,
+                    op_loc,
                     id: expr_id,
                 }),
                 Op::Ne => Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr),
                     rhs: Box::new(rhs),
                     op: BinOp::Ne,
+                    op_loc,
                     id: expr_id,
                 }),
             },
@@ -490,12 +512,14 @@ impl Parser {
         parser_or!(
             self,
             |p| {
-                p.satisfy_(|token| matches!(token.payload, TokenPayload::Eq), "=")?;
+                let op_token =
+                    p.satisfy_(|token| matches!(token.payload, TokenPayload::Eq), "=")?;
                 let rhs = p.assign()?;
                 Ok(Expr::BinOp(ExprBinOp {
                     lhs: Box::new(expr.clone()),
                     rhs: Box::new(rhs),
                     op: BinOp::Assign,
+                    op_loc: op_token.loc,
                     id: p.gen_expr_id(),
                 }))
             },

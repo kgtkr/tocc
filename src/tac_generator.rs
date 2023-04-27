@@ -27,21 +27,39 @@ fn convert_type(typ: Type) -> tac::Type {
 }
 
 #[derive(Debug)]
-struct InstrGenerator {
+struct FuncGenerator {
     locals: Vec<tac::Local>,
     instrs: Vec<tac::Instr>,
     local_idents: HashMap<String, usize>,
     bbs: Vec<tac::BB>,
 }
 
-impl InstrGenerator {
-    fn new() -> InstrGenerator {
-        InstrGenerator {
+impl FuncGenerator {
+    fn gen(func: clang::DeclFunc) -> Result<tac::Func, CodegenError> {
+        let mut gen = FuncGenerator {
             locals: Vec::new(),
             instrs: Vec::new(),
             local_idents: HashMap::new(),
             bbs: Vec::new(),
+        };
+        for (idx, param) in func.params.iter().enumerate() {
+            let arg = gen.add_named_local(
+                param.ident.clone(),
+                &param.ident_loc,
+                tac::Type::Int(tac::TypeInt {}),
+            )?;
+            gen.instrs
+                .push(tac::Instr::SetArg(tac::InstrSetArg { dst: arg, idx }));
         }
+        gen.stmt_compound(func.body)?;
+        let entry = gen.bbs[0].id;
+        Ok(tac::Func {
+            ident: func.ident,
+            args_count: func.params.len(),
+            locals: gen.locals,
+            bbs: gen.bbs,
+            entry,
+        })
     }
 
     fn add_named_local(
@@ -631,37 +649,26 @@ impl InstrGenerator {
     }
 }
 
-pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
-    let funcs = program
-        .decls
-        .into_iter()
-        .map(|decl| {
-            use Decl::*;
-            match decl {
-                Func(x) => {
-                    let mut gen = InstrGenerator::new();
-                    for (idx, param) in x.params.iter().enumerate() {
-                        let arg = gen.add_named_local(
-                            param.ident.clone(),
-                            &param.ident_loc,
-                            tac::Type::Int(tac::TypeInt {}),
-                        )?;
-                        gen.instrs
-                            .push(tac::Instr::SetArg(tac::InstrSetArg { dst: arg, idx }));
-                    }
-                    gen.stmt_compound(x.body)?;
-                    let entry = gen.bbs[0].id;
-                    Ok(tac::Func {
-                        ident: x.ident,
-                        args_count: x.params.len(),
-                        locals: gen.locals,
-                        bbs: gen.bbs,
-                        entry,
-                    })
-                }
-            }
-        })
-        .collect::<Result<Vec<_>, CodegenError>>()?;
+#[derive(Debug)]
+pub struct ProgramGenerator {}
 
-    Ok(tac::Program { funcs })
+impl ProgramGenerator {
+    fn gen(program: Program) -> Result<tac::Program, CodegenError> {
+        let funcs = program
+            .decls
+            .into_iter()
+            .map(|decl| {
+                use Decl::*;
+                match decl {
+                    Func(func) => FuncGenerator::gen(func),
+                }
+            })
+            .collect::<Result<Vec<_>, CodegenError>>()?;
+
+        Ok(tac::Program { funcs })
+    }
+}
+
+pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
+    ProgramGenerator::gen(program)
 }

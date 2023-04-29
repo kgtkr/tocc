@@ -51,7 +51,9 @@ impl FuncGenerator {
             gen.instrs
                 .push(tac::Instr::SetArg(tac::InstrSetArg { dst: arg, idx }));
         }
-        gen.stmt_compound(func.body)?;
+        gen.stmt_compound(
+            func.body.unwrap(), /* TODO: 型自体を宣言と定義で変えたい */
+        )?;
         let entry = gen.bbs[0].id;
         Ok(tac::Func {
             ident: func.ident,
@@ -660,10 +662,19 @@ impl ProgramGenerator {
             .map(|decl| {
                 use Decl::*;
                 match decl {
-                    Func(func) => FuncGenerator::gen(func),
+                    Func(func) => {
+                        if func.body.is_some() {
+                            FuncGenerator::gen(func).map(Some)
+                        } else {
+                            Ok(None)
+                        }
+                    }
                 }
             })
-            .collect::<Result<Vec<_>, CodegenError>>()?;
+            .collect::<Result<Vec<_>, CodegenError>>()?
+            .into_iter()
+            .filter_map(std::convert::identity)
+            .collect::<Vec<_>>();
 
         Ok(tac::Program { funcs })
     }

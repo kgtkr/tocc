@@ -61,7 +61,7 @@ pub struct DeclFunc {
     pub ident_loc: Loc,
     pub ident: String,
     pub params: Vec<DeclParam>,
-    pub body: StmtCompound,
+    pub body: Option<StmtCompound>, // Noneなら宣言
 }
 
 impl Locatable for DeclFunc {

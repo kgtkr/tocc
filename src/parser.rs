@@ -724,12 +724,25 @@ impl Parser {
             |token| matches!(token.payload, TokenPayload::ParenClose),
             ")",
         )?;
-        let stmts = self.compound_stmt()?;
+        let body = parser_or!(
+            self,
+            |p| {
+                let stmts = p.compound_stmt()?;
+                Ok(Some(stmts))
+            },
+            |p| {
+                p.satisfy_(
+                    |token| matches!(token.payload, TokenPayload::Semicolon),
+                    ";",
+                )?;
+                Ok(None)
+            },
+        )?;
         Ok(DeclFunc {
             ident,
             ident_loc,
             params,
-            body: stmts,
+            body,
             typ,
         })
     }

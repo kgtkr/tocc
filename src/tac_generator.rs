@@ -639,29 +639,36 @@ pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
             use Decl::*;
             match decl {
                 Func(x) => {
-                    let mut gen = InstrGenerator::new();
-                    for (idx, param) in x.params.iter().enumerate() {
-                        let arg = gen.add_named_local(
-                            param.ident.clone(),
-                            &param.ident_loc,
-                            tac::Type::Int(tac::TypeInt {}),
-                        )?;
-                        gen.instrs
-                            .push(tac::Instr::SetArg(tac::InstrSetArg { dst: arg, idx }));
+                    if let Some(body) = x.body {
+                        let mut gen = InstrGenerator::new();
+                        for (idx, param) in x.params.iter().enumerate() {
+                            let arg = gen.add_named_local(
+                                param.ident.clone(),
+                                &param.ident_loc,
+                                tac::Type::Int(tac::TypeInt {}),
+                            )?;
+                            gen.instrs
+                                .push(tac::Instr::SetArg(tac::InstrSetArg { dst: arg, idx }));
+                        }
+                        gen.stmt_compound(body)?;
+                        let entry = gen.bbs[0].id;
+                        Ok(Some(tac::Func {
+                            ident: x.ident,
+                            args_count: x.params.len(),
+                            locals: gen.locals,
+                            bbs: gen.bbs,
+                            entry,
+                        }))
+                    } else {
+                        Ok(None)
                     }
-                    gen.stmt_compound(x.body)?;
-                    let entry = gen.bbs[0].id;
-                    Ok(tac::Func {
-                        ident: x.ident,
-                        args_count: x.params.len(),
-                        locals: gen.locals,
-                        bbs: gen.bbs,
-                        entry,
-                    })
                 }
             }
         })
-        .collect::<Result<Vec<_>, CodegenError>>()?;
+        .collect::<Result<Vec<_>, CodegenError>>()?
+        .into_iter()
+        .filter_map(std::convert::identity)
+        .collect::<Vec<_>>();
 
     Ok(tac::Program { funcs })
 }

@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::mem;
 
 use crate::clang::{
-    self, BinOp, Decl, Expr, ExprBinOp, ExprIntLit, Program, Stmt, StmtCompound, StmtExpr, StmtIf,
-    StmtReturn, StmtVarDecl, Type,
+    self, BinOp, Decl, DeclFunc, Expr, ExprBinOp, ExprIntLit, FuncSig, Program, Stmt, StmtCompound,
+    StmtExpr, StmtIf, StmtReturn, StmtVarDecl, Type,
 };
 use crate::loc::{Loc, Locatable};
 use crate::tac::{self, BBId};
@@ -27,20 +27,25 @@ fn convert_type(typ: Type) -> tac::Type {
 }
 
 #[derive(Debug)]
-struct FuncGenerator {
+struct FuncGenerator<'a> {
     locals: Vec<tac::Local>,
     instrs: Vec<tac::Instr>,
     local_idents: HashMap<String, usize>,
     bbs: Vec<tac::BB>,
+    program_generator: &'a ProgramGenerator,
 }
 
-impl FuncGenerator {
-    fn gen(func: clang::DeclFunc) -> Result<tac::Func, CodegenError> {
+impl<'a> FuncGenerator<'a> {
+    fn gen(
+        program_generator: &'a ProgramGenerator,
+        func: clang::DeclFunc,
+    ) -> Result<tac::Func, CodegenError> {
         let mut gen = FuncGenerator {
             locals: Vec::new(),
             instrs: Vec::new(),
             local_idents: HashMap::new(),
             bbs: Vec::new(),
+            program_generator,
         };
         for (idx, param) in func.sig.params.iter().enumerate() {
             let arg = gen.add_named_local(
@@ -592,7 +597,13 @@ impl FuncGenerator {
     }
 
     fn expr_call(&mut self, x: clang::ExprCall) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let Some(dst_typ) = self.program_generator.func_sigs.get(&x.ident).map(|sig|sig.typ.clone()) else {
+            return Err(CodegenError {
+                loc: x.ident_loc.clone(),
+                message: format!("undeclared function `{}`", x.ident),
+            });
+        };
+        let dst = self.generate_local(convert_type(dst_typ));
         let args = x
             .args
             .into_iter()
@@ -652,31 +663,39 @@ impl FuncGenerator {
 }
 
 #[derive(Debug)]
-pub struct ProgramGenerator {}
+pub struct ProgramGenerator {
+    funcs: Vec<tac::Func>,
+    func_sigs: HashMap<String, FuncSig>,
+}
 
 impl ProgramGenerator {
     fn gen(program: Program) -> Result<tac::Program, CodegenError> {
-        let funcs = program
-            .decls
-            .into_iter()
-            .map(|decl| {
-                use Decl::*;
-                match decl {
-                    Func(func) => {
-                        if func.body.is_some() {
-                            FuncGenerator::gen(func).map(Some)
-                        } else {
-                            Ok(None)
-                        }
-                    }
-                }
-            })
-            .collect::<Result<Vec<_>, CodegenError>>()?
-            .into_iter()
-            .filter_map(std::convert::identity)
-            .collect::<Vec<_>>();
+        let mut gen = Self {
+            funcs: Vec::new(),
+            func_sigs: HashMap::new(),
+        };
 
-        Ok(tac::Program { funcs })
+        for decl in program.decls {
+            use Decl::*;
+            match decl {
+                Func(func) => {
+                    gen.func(func)?;
+                }
+            }
+        }
+
+        Ok(tac::Program { funcs: gen.funcs })
+    }
+
+    fn func(&mut self, func: DeclFunc) -> Result<(), CodegenError> {
+        self.func_sigs
+            .insert(func.sig.ident.clone(), func.sig.clone());
+
+        if func.body.is_some() {
+            self.funcs.push(FuncGenerator::gen(&self, func)?);
+        }
+
+        Ok(())
     }
 }
 

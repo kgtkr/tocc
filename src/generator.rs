@@ -292,17 +292,21 @@ impl FuncGenerator {
     }
 
     fn bin_op_add(&mut self, lhs: usize, rhs: usize, dst: usize) {
-        self.buf += format!("mov eax, {}\n", self.local(lhs));
-        self.buf += format!("mov edi, {}\n", self.local(rhs));
-        self.buf += "add rax, rdi\n";
-        self.buf += format!("mov {}, eax\n", self.local(dst));
+        let ax = Register::Rax.for_bit(self.locals[lhs].typ.to_bit());
+        let di = Register::Rdi.for_bit(self.locals[rhs].typ.to_bit());
+        self.buf += format!("mov {ax}, {}\n", self.local(lhs));
+        self.buf += format!("mov {di}, {}\n", self.local(rhs));
+        self.buf += format!("add rax, rdi\n");
+        self.buf += format!("mov {}, {ax}\n", self.local(dst));
     }
 
     fn bin_op_sub(&mut self, lhs: usize, rhs: usize, dst: usize) {
-        self.buf += format!("mov eax, {}\n", self.local(lhs));
-        self.buf += format!("mov edi, {}\n", self.local(rhs));
+        let ax = Register::Rax.for_bit(self.locals[lhs].typ.to_bit());
+        let di = Register::Rdi.for_bit(self.locals[rhs].typ.to_bit());
+        self.buf += format!("mov {ax}, {}\n", self.local(lhs));
+        self.buf += format!("mov {di}, {}\n", self.local(rhs));
         self.buf += "sub rax, rdi\n";
-        self.buf += format!("mov {}, eax\n", self.local(dst));
+        self.buf += format!("mov {}, {ax}\n", self.local(dst));
     }
 
     fn bin_op_mul(&mut self, lhs: usize, rhs: usize, dst: usize) {
@@ -448,7 +452,8 @@ impl FuncGenerator {
 
         self.buf += format!("call {}\n", x.ident);
         self.buf += format!("add rsp, {}\n", extra_args_size);
-        self.buf += format!("mov {}, eax\n", self.local(x.dst));
+        let ax = Register::Rax.for_bit(self.locals[x.dst].typ.to_bit());
+        self.buf += format!("mov {}, {ax}\n", self.local(x.dst));
 
         for reg_id in x.save_regs.iter().rev() {
             let reg = Register::from_id(*reg_id).for_bit(Bit::Bit64);

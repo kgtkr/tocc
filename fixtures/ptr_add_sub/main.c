@@ -1,4 +1,4 @@
-int *malloc(int);
+int *malloc(int size);
 
 int main() {
     int *p;

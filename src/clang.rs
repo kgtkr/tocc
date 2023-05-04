@@ -57,27 +57,38 @@ impl Locatable for Decl {
 
 #[derive(Debug, Clone)]
 pub struct DeclFunc {
-    pub typ: Type,
-    pub ident_loc: Loc,
-    pub ident: String,
-    pub params: Vec<DeclParam>,
-    pub body: Option<StmtCompound>, // Noneなら宣言
+    pub sig: FuncSig,
+    pub body: Option<StmtCompound>,
 }
 
 impl Locatable for DeclFunc {
+    fn loc(&self) -> &Loc {
+        self.sig.loc()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FuncSig {
+    pub typ: Type,
+    pub ident_loc: Loc,
+    pub ident: String,
+    pub params: Vec<FuncParam>,
+}
+
+impl Locatable for FuncSig {
     fn loc(&self) -> &Loc {
         self.typ.loc()
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct DeclParam {
+pub struct FuncParam {
     pub typ: Type,
     pub ident: String,
     pub ident_loc: Loc,
 }
 
-impl Locatable for DeclParam {
+impl Locatable for FuncParam {
     fn loc(&self) -> &Loc {
         self.typ.loc()
     }

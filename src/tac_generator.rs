@@ -42,7 +42,7 @@ impl FuncGenerator {
             local_idents: HashMap::new(),
             bbs: Vec::new(),
         };
-        for (idx, param) in func.params.iter().enumerate() {
+        for (idx, param) in func.sig.params.iter().enumerate() {
             let arg = gen.add_named_local(
                 param.ident.clone(),
                 &param.ident_loc,
@@ -56,8 +56,8 @@ impl FuncGenerator {
         )?;
         let entry = gen.bbs[0].id;
         Ok(tac::Func {
-            ident: func.ident,
-            args_count: func.params.len(),
+            ident: func.sig.ident,
+            args_count: func.sig.params.len(),
             locals: gen.locals,
             bbs: gen.bbs,
             entry,

@@ -1,7 +1,7 @@
 use crate::clang::{
-    BinOp, Decl, DeclFunc, DeclParam, Expr, ExprAddr, ExprBinOp, ExprCall, ExprIntLit, ExprLValue,
-    ExprNeg, LValueDeref, LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor, StmtIf,
-    StmtReturn, StmtVarDecl, StmtWhile, Type, TypeInt, TypePtr,
+    BinOp, Decl, DeclFunc, Expr, ExprAddr, ExprBinOp, ExprCall, ExprIntLit, ExprLValue, ExprNeg,
+    FuncParam, FuncSig, LValueDeref, LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor,
+    StmtIf, StmtReturn, StmtVarDecl, StmtWhile, Type, TypeInt, TypePtr,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -688,6 +688,25 @@ impl Parser {
     }
 
     fn func_decl(&mut self) -> Result<DeclFunc, ParseError> {
+        let sig = self.func_sig()?;
+        let body = parser_or!(
+            self,
+            |p| {
+                let stmts = p.compound_stmt()?;
+                Ok(Some(stmts))
+            },
+            |p| {
+                p.satisfy_(
+                    |token| matches!(token.payload, TokenPayload::Semicolon),
+                    ";",
+                )?;
+                Ok(None)
+            },
+        )?;
+        Ok(DeclFunc { sig, body })
+    }
+
+    fn func_sig(&mut self) -> Result<FuncSig, ParseError> {
         let typ = self.typ()?;
 
         let (ident, ident_loc) = self.satisfy(|token| match &token.payload {
@@ -709,7 +728,7 @@ impl Parser {
                         expected: "identifier".to_string(),
                     }),
                 })?;
-                Ok(DeclParam {
+                Ok(FuncParam {
                     typ,
                     ident,
                     ident_loc,
@@ -724,25 +743,11 @@ impl Parser {
             |token| matches!(token.payload, TokenPayload::ParenClose),
             ")",
         )?;
-        let body = parser_or!(
-            self,
-            |p| {
-                let stmts = p.compound_stmt()?;
-                Ok(Some(stmts))
-            },
-            |p| {
-                p.satisfy_(
-                    |token| matches!(token.payload, TokenPayload::Semicolon),
-                    ";",
-                )?;
-                Ok(None)
-            },
-        )?;
-        Ok(DeclFunc {
+
+        Ok(FuncSig {
             ident,
             ident_loc,
             params,
-            body,
             typ,
         })
     }

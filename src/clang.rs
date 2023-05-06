@@ -1,6 +1,7 @@
 use crate::loc::{Loc, Locatable};
+use derive_more::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Display)]
 pub enum Type {
     Int(TypeInt),
     Ptr(TypePtr),
@@ -15,7 +16,8 @@ impl Locatable for Type {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Display)]
+#[display(fmt = "int")]
 pub struct TypeInt {
     pub int_loc: Loc,
 }
@@ -26,7 +28,8 @@ impl Locatable for TypeInt {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Display)]
+#[display(fmt = "*{}", typ)]
 pub struct TypePtr {
     pub typ: Box<Type>,
 }

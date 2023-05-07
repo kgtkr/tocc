@@ -1,32 +1,22 @@
 use std::collections::HashSet;
 
 use crate::{reg_alloc, Bit};
-use derive_more::{From, Into, Unwrap};
+use derive_more::{From, Into};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Into, From)]
 pub struct BBId(usize);
 
-#[derive(Debug, Clone, Unwrap)]
+#[derive(Debug, Clone)]
 pub enum Type {
-    Int(TypeInt),
-    Ptr(TypePtr),
+    Int(Bit),
 }
 
 impl Type {
     pub fn to_bit(&self) -> Bit {
         match self {
-            Type::Int(_) => Bit::Bit32,
-            Type::Ptr(_) => Bit::Bit64,
+            Type::Int(bit) => *bit,
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct TypeInt {}
-
-#[derive(Debug, Clone)]
-pub struct TypePtr {
-    pub typ: Box<Type>,
 }
 
 #[derive(Debug, Clone)]

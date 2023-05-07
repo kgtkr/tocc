@@ -1,7 +1,7 @@
 use crate::loc::{Loc, Locatable};
-use derive_more::Display;
+use derive_more::{Display, Unwrap};
 
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, Display, Unwrap)]
 pub enum Type {
     Int(TypeInt),
     Ptr(TypePtr),

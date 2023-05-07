@@ -19,8 +19,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = read_to_string(&args.input)?;
     let tokens = Lexer::new(args.input.clone(), input).tokenize()?;
     let clang = Parser::new(tokens).parse()?;
-    static_analysis(&clang)?;
-    let mut tac = tac_generator::generate(clang)?;
+    let analysis = static_analysis(&clang)?;
+    let mut tac = tac_generator::generate(&analysis.exprs, clang)?;
     tac::optimize(&mut tac);
     let asm = generator::generate(tac);
     std::fs::write(&args.output, asm)?;

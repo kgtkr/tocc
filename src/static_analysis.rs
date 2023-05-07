@@ -7,7 +7,6 @@ use crate::{
         StmtIf, StmtReturn, StmtVarDecl, StmtWhile, Type, TypeInt, TypePtr,
     },
     loc::{Loc, Locatable},
-    tac_generator::CodegenError,
 };
 use thiserror::Error;
 #[derive(Debug)]

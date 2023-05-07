@@ -4,10 +4,11 @@ use std::mem;
 
 use crate::clang::{
     self, BinOp, Decl, DeclFunc, Expr, ExprBinOp, ExprIntLit, FuncSig, Program, Stmt, StmtCompound,
-    StmtExpr, StmtIf, StmtReturn, StmtVarDecl, Type,
+    StmtExpr, StmtIf, StmtReturn, StmtVarDecl, Type, TypePtr,
 };
 use crate::loc::{Loc, Locatable};
 use crate::tac::{self, BBId};
+use crate::Bit;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
@@ -17,12 +18,10 @@ pub struct CodegenError {
     message: String,
 }
 
-fn convert_type(typ: Type) -> tac::Type {
+fn convert_type(typ: &Type) -> tac::Type {
     match typ {
-        Type::Int(_) => tac::Type::Int(tac::TypeInt {}),
-        Type::Ptr(ptr) => tac::Type::Ptr(tac::TypePtr {
-            typ: Box::new(convert_type(*ptr.typ)),
-        }),
+        Type::Int(_) => tac::Type::Int(Bit::Bit32),
+        Type::Ptr(_) => tac::Type::Int(Bit::Bit64),
     }
 }
 
@@ -32,12 +31,12 @@ struct FuncGenerator<'a> {
     instrs: Vec<tac::Instr>,
     local_idents: HashMap<String, usize>,
     bbs: Vec<tac::BB>,
-    program_generator: &'a ProgramGenerator,
+    expr_types: &'a HashMap<usize, Type>,
 }
 
 impl<'a> FuncGenerator<'a> {
     fn gen(
-        program_generator: &'a ProgramGenerator,
+        expr_types: &'a HashMap<usize, Type>,
         func: clang::DeclFunc,
     ) -> Result<tac::Func, CodegenError> {
         let mut gen = FuncGenerator {
@@ -45,13 +44,13 @@ impl<'a> FuncGenerator<'a> {
             instrs: Vec::new(),
             local_idents: HashMap::new(),
             bbs: Vec::new(),
-            program_generator,
+            expr_types,
         };
         for (idx, param) in func.sig.params.iter().enumerate() {
             let arg = gen.add_named_local(
                 param.ident.clone(),
                 &param.ident_loc,
-                tac::Type::Int(tac::TypeInt {}),
+                tac::Type::Int(Bit::Bit32),
             )?;
             gen.instrs
                 .push(tac::Instr::SetArg(tac::InstrSetArg { dst: arg, idx }));
@@ -142,7 +141,7 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn stmt_var_decl(&mut self, x: StmtVarDecl) -> Result<(), CodegenError> {
-        self.add_named_local(x.ident, &x.ident_loc, convert_type(x.typ))?;
+        self.add_named_local(x.ident, &x.ident_loc, convert_type(&x.typ))?;
         Ok(())
     }
 
@@ -213,7 +212,7 @@ impl<'a> FuncGenerator<'a> {
         let cond = if let Some(cond) = x.cond {
             self.expr(cond)?
         } else {
-            let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+            let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
             self.instrs
                 .push(tac::Instr::IntConst(tac::InstrIntConst { dst, value: 1 }));
             dst
@@ -256,7 +255,7 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn expr_int_lit(&mut self, x: ExprIntLit) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
         self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
             dst,
             value: x.value,
@@ -281,14 +280,15 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn bin_op_add(&mut self, lhs: Expr, rhs: Expr, op_loc: Loc) -> Result<usize, CodegenError> {
+        let l_typ = &self.expr_types[&lhs.id()];
+        let r_typ = &self.expr_types[&rhs.id()];
+
         let lhs = self.expr(lhs)?;
         let rhs = self.expr(rhs)?;
 
-        let l_typ = self.locals[lhs].typ.clone();
-        let r_typ = self.locals[rhs].typ.clone();
         match (l_typ, r_typ) {
-            (tac::Type::Int(_), tac::Type::Int(_)) => {
-                let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+            (Type::Int(_), Type::Int(_)) => {
+                let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
                 self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
                     dst,
                     lhs,
@@ -297,15 +297,13 @@ impl<'a> FuncGenerator<'a> {
                 }));
                 Ok(dst)
             }
-            (tac::Type::Ptr(tac::TypePtr { typ: l_inner_typ }), tac::Type::Int(_)) => {
-                let ptr_inner_size = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-                let add_val = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-                let dst = self.generate_local(tac::Type::Ptr(tac::TypePtr {
-                    typ: l_inner_typ.clone(),
-                }));
+            (Type::Ptr(TypePtr { typ: l_inner_typ }), Type::Int(_)) => {
+                let ptr_inner_size = self.generate_local(tac::Type::Int(Bit::Bit32));
+                let add_val = self.generate_local(tac::Type::Int(Bit::Bit32));
+                let dst = self.generate_local(tac::Type::Int(Bit::Bit64));
                 self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
                     dst: ptr_inner_size,
-                    value: l_inner_typ.to_bit().to_size() as i64,
+                    value: convert_type(l_inner_typ.as_ref()).to_bit().to_size() as i64,
                 }));
                 self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
                     dst: add_val,
@@ -321,15 +319,13 @@ impl<'a> FuncGenerator<'a> {
                 }));
                 Ok(dst)
             }
-            (tac::Type::Int(_), tac::Type::Ptr(tac::TypePtr { typ: r_inner_typ })) => {
-                let ptr_inner_size = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-                let add_val = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-                let dst = self.generate_local(tac::Type::Ptr(tac::TypePtr {
-                    typ: r_inner_typ.clone(),
-                }));
+            (Type::Int(_), Type::Ptr(TypePtr { typ: r_inner_typ })) => {
+                let ptr_inner_size = self.generate_local(tac::Type::Int(Bit::Bit32));
+                let add_val = self.generate_local(tac::Type::Int(Bit::Bit32));
+                let dst = self.generate_local(tac::Type::Int(Bit::Bit64));
                 self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
                     dst: ptr_inner_size,
-                    value: r_inner_typ.to_bit().to_size() as i64,
+                    value: convert_type(r_inner_typ.as_ref()).to_bit().to_size() as i64,
                 }));
                 self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
                     dst: add_val,
@@ -353,14 +349,14 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn bin_op_sub(&mut self, lhs: Expr, rhs: Expr, op_loc: Loc) -> Result<usize, CodegenError> {
+        let l_typ = &self.expr_types[&lhs.id()];
+        let r_typ = &self.expr_types[&rhs.id()];
         let lhs = self.expr(lhs)?;
         let rhs = self.expr(rhs)?;
 
-        let l_typ = self.locals[lhs].typ.clone();
-        let r_typ = self.locals[rhs].typ.clone();
         match (l_typ, r_typ) {
-            (tac::Type::Int(_), tac::Type::Int(_)) => {
-                let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+            (Type::Int(_), Type::Int(_)) => {
+                let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
                 self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
                     dst,
                     lhs,
@@ -369,15 +365,13 @@ impl<'a> FuncGenerator<'a> {
                 }));
                 Ok(dst)
             }
-            (tac::Type::Ptr(tac::TypePtr { typ: l_inner_typ }), tac::Type::Int(_)) => {
-                let ptr_inner_size = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-                let add_val = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-                let dst = self.generate_local(tac::Type::Ptr(tac::TypePtr {
-                    typ: l_inner_typ.clone(),
-                }));
+            (Type::Ptr(TypePtr { typ: l_inner_typ }), Type::Int(_)) => {
+                let ptr_inner_size = self.generate_local(tac::Type::Int(Bit::Bit32));
+                let add_val = self.generate_local(tac::Type::Int(Bit::Bit32));
+                let dst = self.generate_local(tac::Type::Int(Bit::Bit64));
                 self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
                     dst: ptr_inner_size,
-                    value: l_inner_typ.to_bit().to_size() as i64,
+                    value: convert_type(l_inner_typ.as_ref()).to_bit().to_size() as i64,
                 }));
                 self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
                     dst: add_val,
@@ -393,13 +387,10 @@ impl<'a> FuncGenerator<'a> {
                 }));
                 Ok(dst)
             }
-            (
-                tac::Type::Ptr(tac::TypePtr { typ: l_inner_typ }),
-                tac::Type::Ptr(tac::TypePtr { typ: r_inner_typ }),
-            ) => {
-                let sub_val = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-                let ptr_inner_size = self.generate_local(tac::Type::Int(tac::TypeInt {}));
-                let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+            (Type::Ptr(TypePtr { typ: l_inner_typ }), Type::Ptr(TypePtr { typ: r_inner_typ })) => {
+                let sub_val = self.generate_local(tac::Type::Int(Bit::Bit32));
+                let ptr_inner_size = self.generate_local(tac::Type::Int(Bit::Bit32));
+                let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
                 self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
                     dst: sub_val,
                     lhs,
@@ -408,7 +399,7 @@ impl<'a> FuncGenerator<'a> {
                 }));
                 self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
                     dst: ptr_inner_size,
-                    value: l_inner_typ.to_bit().to_size() as i64,
+                    value: convert_type(l_inner_typ.as_ref()).to_bit().to_size() as i64,
                 }));
                 self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
                     dst,
@@ -426,7 +417,7 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn bin_op_mul(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
         let lhs = self.expr(lhs)?;
         let rhs = self.expr(rhs)?;
         self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
@@ -439,7 +430,7 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn bin_op_div(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
         let lhs = self.expr(lhs)?;
         let rhs = self.expr(rhs)?;
         self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
@@ -452,7 +443,7 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn bin_op_eq(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
         let lhs = self.expr(lhs)?;
         let rhs = self.expr(rhs)?;
         self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
@@ -465,7 +456,7 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn bin_op_ne(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
         let lhs = self.expr(lhs)?;
         let rhs = self.expr(rhs)?;
         self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
@@ -478,7 +469,7 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn bin_op_lt(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
         let lhs = self.expr(lhs)?;
         let rhs = self.expr(rhs)?;
         self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
@@ -491,7 +482,7 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn bin_op_le(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
         let lhs = self.expr(lhs)?;
         let rhs = self.expr(rhs)?;
         self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
@@ -504,7 +495,7 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn bin_op_gt(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
         let lhs = self.expr(lhs)?;
         let rhs = self.expr(rhs)?;
         self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
@@ -517,7 +508,7 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn bin_op_ge(&mut self, lhs: Expr, rhs: Expr) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
         let lhs = self.expr(lhs)?;
         let rhs = self.expr(rhs)?;
         self.instrs.push(tac::Instr::BinOp(tac::InstrBinOp {
@@ -562,7 +553,7 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn expr_neg(&mut self, x: clang::ExprNeg) -> Result<usize, CodegenError> {
-        let dst = self.generate_local(tac::Type::Int(tac::TypeInt {}));
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
         let src = self.expr(*x.expr)?;
         self.instrs.push(tac::Instr::UnOp(tac::InstrUnOp {
             dst,
@@ -584,9 +575,9 @@ impl<'a> FuncGenerator<'a> {
                 })?;
             Ok(dst)
         } else {
+            let src_type = &self.expr_types[&x.id()];
             let src = self.lvalue(x)?;
-            let src_type = self.locals[src].typ.clone();
-            let dst = self.generate_local(*src_type.unwrap_ptr().typ);
+            let dst = self.generate_local(convert_type(src_type));
             self.instrs.push(tac::Instr::UnOp(tac::InstrUnOp {
                 dst,
                 src,
@@ -597,12 +588,7 @@ impl<'a> FuncGenerator<'a> {
     }
 
     fn expr_call(&mut self, x: clang::ExprCall) -> Result<usize, CodegenError> {
-        let Some(dst_typ) = self.program_generator.func_sigs.get(&x.ident).map(|sig|sig.typ.clone()) else {
-            return Err(CodegenError {
-                loc: x.ident_loc.clone(),
-                message: format!("undeclared function `{}`", x.ident),
-            });
-        };
+        let dst_typ = &self.expr_types[&x.id];
         let dst = self.generate_local(convert_type(dst_typ));
         let args = x
             .args
@@ -645,10 +631,7 @@ impl<'a> FuncGenerator<'a> {
                 message: format!("undeclared variable `{}`", x.ident),
             })?;
 
-        let local = &self.locals[src];
-        let dst = self.generate_local(tac::Type::Ptr(tac::TypePtr {
-            typ: Box::new(local.typ.clone()),
-        }));
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit64));
         self.instrs.push(tac::Instr::UnOp(tac::InstrUnOp {
             dst,
             src,
@@ -663,16 +646,21 @@ impl<'a> FuncGenerator<'a> {
 }
 
 #[derive(Debug)]
-pub struct ProgramGenerator {
+pub struct ProgramGenerator<'a> {
     funcs: Vec<tac::Func>,
     func_sigs: HashMap<String, FuncSig>,
+    expr_types: &'a HashMap<usize, Type>,
 }
 
-impl ProgramGenerator {
-    fn gen(program: Program) -> Result<tac::Program, CodegenError> {
+impl<'a> ProgramGenerator<'a> {
+    fn gen(
+        expr_types: &'a HashMap<usize, Type>,
+        program: Program,
+    ) -> Result<tac::Program, CodegenError> {
         let mut gen = Self {
             funcs: Vec::new(),
             func_sigs: HashMap::new(),
+            expr_types,
         };
 
         for decl in program.decls {
@@ -692,13 +680,16 @@ impl ProgramGenerator {
             .insert(func.sig.ident.clone(), func.sig.clone());
 
         if func.body.is_some() {
-            self.funcs.push(FuncGenerator::gen(&self, func)?);
+            self.funcs.push(FuncGenerator::gen(self.expr_types, func)?);
         }
 
         Ok(())
     }
 }
 
-pub fn generate(program: Program) -> Result<tac::Program, CodegenError> {
-    ProgramGenerator::gen(program)
+pub fn generate(
+    expr_types: &HashMap<usize, Type>,
+    program: Program,
+) -> Result<tac::Program, CodegenError> {
+    ProgramGenerator::gen(expr_types, program)
 }

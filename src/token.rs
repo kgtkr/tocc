@@ -39,4 +39,5 @@ pub enum TokenPayload {
     For,
     Comma,
     Amp,
+    Sizeof,
 }

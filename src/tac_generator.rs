@@ -251,6 +251,8 @@ impl<'a> FuncGenerator<'a> {
             LValue(x) => self.expr_lvalue(x),
             Call(x) => self.expr_call(x),
             Addr(x) => self.expr_addr(x),
+            SizeofExpr(x) => self.expr_sizeof_expr(x),
+            SizeofType(x) => self.expr_sizeof_type(x),
         }
     }
 
@@ -612,6 +614,28 @@ impl<'a> FuncGenerator<'a> {
             });
         };
         self.lvalue(lvalue)
+    }
+
+    fn expr_sizeof_type(&mut self, x: clang::ExprSizeofType) -> Result<usize, CodegenError> {
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
+        let size = convert_type(&x.typ).to_bit().to_size();
+        self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
+            dst,
+            value: size as i64,
+        }));
+        Ok(dst)
+    }
+
+    fn expr_sizeof_expr(&mut self, x: clang::ExprSizeofExpr) -> Result<usize, CodegenError> {
+        let dst = self.generate_local(tac::Type::Int(Bit::Bit32));
+        let size = convert_type(&self.expr_types[&x.expr.id()])
+            .to_bit()
+            .to_size();
+        self.instrs.push(tac::Instr::IntConst(tac::InstrIntConst {
+            dst,
+            value: size as i64,
+        }));
+        Ok(dst)
     }
 
     fn lvalue(&mut self, x: clang::ExprLValue) -> Result<usize, CodegenError> {

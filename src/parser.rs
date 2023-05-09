@@ -1,7 +1,8 @@
 use crate::clang::{
     BinOp, Decl, DeclFunc, Expr, ExprAddr, ExprBinOp, ExprCall, ExprIntLit, ExprLValue, ExprNeg,
-    FuncParam, FuncSig, LValueDeref, LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor,
-    StmtIf, StmtReturn, StmtVarDecl, StmtWhile, Type, TypeInt, TypePtr,
+    ExprSizeofExpr, ExprSizeofType, FuncParam, FuncSig, LValueDeref, LValueVar, Program, Stmt,
+    StmtCompound, StmtExpr, StmtFor, StmtIf, StmtReturn, StmtVarDecl, StmtWhile, Type, TypeInt,
+    TypePtr,
 };
 use crate::token::{Token, TokenPayload};
 use derive_more::Display;
@@ -296,6 +297,53 @@ impl Parser {
                     expr: Box::new(expr),
                     id: p.gen_expr_id(),
                 })))
+            },
+            |p| {
+                let sizeof = p.satisfy_(
+                    |token| matches!(token.payload, TokenPayload::Sizeof),
+                    "sizeof",
+                )?;
+                parser_or!(
+                    p,
+                    |p| {
+                        p.satisfy_(
+                            |token| matches!(token.payload, TokenPayload::ParenOpen),
+                            "(",
+                        )?;
+                        let result = parser_or!(
+                            p,
+                            |p| {
+                                let typ = p.typ()?;
+                                Ok(Expr::SizeofType(ExprSizeofType {
+                                    sizeof_loc: sizeof.loc.clone(),
+                                    typ,
+                                    id: p.gen_expr_id(),
+                                }))
+                            },
+                            |p| {
+                                let expr = p.expr()?;
+                                Ok(Expr::SizeofExpr(ExprSizeofExpr {
+                                    sizeof_loc: sizeof.loc.clone(),
+                                    expr: Box::new(expr),
+                                    id: p.gen_expr_id(),
+                                }))
+                            },
+                        )?;
+                        p.satisfy_(
+                            |token| matches!(token.payload, TokenPayload::ParenClose),
+                            ")",
+                        )?;
+                        Ok(result)
+                    },
+                    |p| {
+                        let expr = p.unary()?;
+                        Ok(Expr::SizeofExpr(ExprSizeofExpr {
+                            sizeof_loc: sizeof.loc.clone(),
+                            expr: Box::new(expr),
+                            id: p.gen_expr_id(),
+                        }))
+                    },
+                )
             },
             |p| p.primary(),
         )

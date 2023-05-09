@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use crate::{
     clang::{
         BinOp, Decl, DeclFunc, Expr, ExprAddr, ExprBinOp, ExprCall, ExprIntLit, ExprLValue,
-        ExprNeg, FuncSig, LValueDeref, LValueVar, Program, Stmt, StmtCompound, StmtExpr, StmtFor,
-        StmtIf, StmtReturn, StmtVarDecl, StmtWhile, Type, TypeInt, TypePtr,
+        ExprNeg, ExprSizeofExpr, ExprSizeofType, FuncSig, LValueDeref, LValueVar, Program, Stmt,
+        StmtCompound, StmtExpr, StmtFor, StmtIf, StmtReturn, StmtVarDecl, StmtWhile, Type, TypeInt,
+        TypePtr,
     },
     loc::{Loc, Locatable},
 };
@@ -164,6 +165,8 @@ impl<'a> FuncAnalysis<'a> {
             LValue(x) => self.expr_lvalue(x),
             Call(x) => self.expr_call(x),
             Addr(x) => self.expr_addr(x),
+            SizeofType(x) => self.expr_sizeof_type(x),
+            SizeofExpr(x) => self.expr_sizeof_expr(x),
         }
     }
 
@@ -420,6 +423,27 @@ impl<'a> FuncAnalysis<'a> {
         let typ = self.exprs[&x.expr.as_ref().id()].clone();
         self.exprs
             .insert(x.id, Type::Ptr(TypePtr { typ: Box::new(typ) }));
+        Ok(())
+    }
+
+    fn expr_sizeof_type(&mut self, x: &ExprSizeofType) -> Result<(), StaticAnalysisError> {
+        self.exprs.insert(
+            x.id,
+            Type::Int(TypeInt {
+                int_loc: Loc::dummy(),
+            }),
+        );
+        Ok(())
+    }
+
+    fn expr_sizeof_expr(&mut self, x: &ExprSizeofExpr) -> Result<(), StaticAnalysisError> {
+        self.expr(x.expr.as_ref())?;
+        self.exprs.insert(
+            x.id,
+            Type::Int(TypeInt {
+                int_loc: Loc::dummy(),
+            }),
+        );
         Ok(())
     }
 

@@ -102,6 +102,7 @@ impl Lexer {
                     "else" => TokenPayload::Else,
                     "while" => TokenPayload::While,
                     "for" => TokenPayload::For,
+                    "sizeof" => TokenPayload::Sizeof,
                     _ => TokenPayload::Ident(ident),
                 })
             }

@@ -220,6 +220,8 @@ pub enum Expr {
     Addr(ExprAddr),
     LValue(ExprLValue),
     Call(ExprCall),
+    SizeofType(ExprSizeofType),
+    SizeofExpr(ExprSizeofExpr),
 }
 
 impl Locatable for Expr {
@@ -231,6 +233,8 @@ impl Locatable for Expr {
             Expr::LValue(x) => x.loc(),
             Expr::Call(x) => x.loc(),
             Expr::Addr(x) => x.loc(),
+            Expr::SizeofType(x) => x.loc(),
+            Expr::SizeofExpr(x) => x.loc(),
         }
     }
 }
@@ -244,6 +248,8 @@ impl Expr {
             Expr::LValue(x) => x.id(),
             Expr::Call(x) => x.id,
             Expr::Addr(x) => x.id,
+            Expr::SizeofType(x) => x.id,
+            Expr::SizeofExpr(x) => x.id,
         }
     }
 }
@@ -391,5 +397,31 @@ pub struct ExprDeref {
 impl Locatable for ExprDeref {
     fn loc(&self) -> &Loc {
         &self.star_loc
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprSizeofType {
+    pub sizeof_loc: Loc,
+    pub typ: Type,
+    pub id: usize,
+}
+
+impl Locatable for ExprSizeofType {
+    fn loc(&self) -> &Loc {
+        &self.sizeof_loc
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprSizeofExpr {
+    pub sizeof_loc: Loc,
+    pub expr: Box<Expr>,
+    pub id: usize,
+}
+
+impl Locatable for ExprSizeofExpr {
+    fn loc(&self) -> &Loc {
+        &self.sizeof_loc
     }
 }

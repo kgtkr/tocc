@@ -139,9 +139,9 @@ pub enum Instr {
 impl Instr {
     pub fn local_usage(&self) -> LocalUsage {
         match self {
-            Instr::IntConst(_) => LocalUsage {
+            Instr::IntConst(InstrIntConst { dst, .. }) => LocalUsage {
                 gen: HashSet::new(),
-                kill: HashSet::new(),
+                kill: HashSet::from([*dst]),
                 referenced: HashSet::new(),
             },
             Instr::BinOp(InstrBinOp { lhs, rhs, dst, .. }) => LocalUsage {

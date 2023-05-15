@@ -13,3 +13,4 @@ mod reg_alloc;
 pub use reg_alloc::reg_alloc;
 mod static_analysis;
 pub use static_analysis::static_analysis;
+mod dom;

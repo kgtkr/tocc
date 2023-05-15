@@ -120,14 +120,14 @@ fn local_live_ranges(func: &Func) -> HashMap<usize, ((usize, usize), (usize, usi
         .iter()
         .map(|bb| (bb.id, HashSet::new()))
         .collect::<HashMap<_, _>>();
-    let mut succs = func
+    let mut preds = func
         .bbs
         .iter()
         .map(|bb| (bb.id, HashSet::new()))
         .collect::<HashMap<_, _>>();
     for bb in &func.bbs {
         for next in bb.term().nexts() {
-            succs.get_mut(&next).unwrap().insert(bb.id);
+            preds.get_mut(&next).unwrap().insert(bb.id);
         }
     }
 
@@ -139,8 +139,8 @@ fn local_live_ranges(func: &Func) -> HashMap<usize, ((usize, usize), (usize, usi
             let prev_in = in_[&bb.id].clone();
             let prev_out = out[&bb.id].clone();
 
-            for succ in &succs[&bb.id] {
-                *out.get_mut(&bb.id).unwrap() = out[&bb.id].union(&in_[succ]).copied().collect();
+            for pred in &preds[&bb.id] {
+                *out.get_mut(&bb.id).unwrap() = out[&bb.id].union(&in_[pred]).copied().collect();
             }
 
             *in_.get_mut(&bb.id).unwrap() = bb_usages[&bb.id]

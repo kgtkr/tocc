@@ -45,7 +45,7 @@ fn dom(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
                 })
                 .unwrap();
             new_dom.insert(bb.id);
-            if new_dom != doms[&bb.id] {
+            if new_dom.len() != doms[&bb.id].len() {
                 doms.insert(bb.id, new_dom);
                 changed = true;
             }

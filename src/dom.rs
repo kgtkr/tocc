@@ -114,6 +114,7 @@ fn dom_front(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
         .collect::<HashMap<_, _>>();
     for (a, bs) in &idom {
         for b in bs {
+            debug_assert!(idom_inv[b].is_none());
             *idom_inv.get_mut(b).unwrap() = Some(*a);
         }
     }

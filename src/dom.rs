@@ -55,22 +55,27 @@ fn dom(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
     doms
 }
 
-fn idom(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
+fn sdom(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
     let doms = dom(func);
     let sdoms = doms
         .iter()
         .map(|(a, dom)| {
             (
                 *a,
-                dom.into_iter().filter(|&b| a != b).collect::<HashSet<_>>(),
+                dom.into_iter()
+                    .filter(|&b| a != b)
+                    .copied()
+                    .collect::<HashSet<_>>(),
             )
         })
         .collect::<HashMap<_, _>>();
+    sdoms
+}
 
-    let mut sdom_preds = func
-        .bbs
+fn idom(sdoms: HashMap<BBId, HashSet<BBId>>) -> HashMap<BBId, HashSet<BBId>> {
+    let mut sdom_preds = sdoms
         .iter()
-        .map(|bb| (bb.id, HashSet::new()))
+        .map(|(bb_id, _)| (bb_id, HashSet::new()))
         .collect::<HashMap<_, _>>();
     for (a, sdom) in &sdoms {
         for b in sdom {
@@ -83,7 +88,6 @@ fn idom(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
         .map(|(a, sdom)| {
             (*a, {
                 sdom.iter()
-                    .copied()
                     .filter(|b| sdom_preds[b].iter().all(|c| !sdom.contains(c)))
                     .copied()
                     .collect::<HashSet<_>>()
@@ -93,25 +97,37 @@ fn idom(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
 
     idoms
 }
-/*
-fn dom_front(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
-    let idoms = idom(func);
 
-    let df_local = func
+fn dom_front(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
+    let sdom = sdom(func);
+    let idom = idom(sdom.clone());
+
+    let mut df = func
         .bbs
         .iter()
-        .map(|bb| {
-            (bb.id, {
-                bb.term()
-                    .nexts()
-                    .iter()
-                    .filter(|&next| !idoms[&bb.id].contains(next))
-                    .copied()
-                    .collect::<HashSet<_>>()
-            })
-        })
+        .map(|bb| (bb.id, HashSet::new()))
         .collect::<HashMap<_, _>>();
 
-    ()
+    let mut idom_inv = idom
+        .iter()
+        .map(|(bb_id, _)| (*bb_id, None))
+        .collect::<HashMap<_, _>>();
+    for (a, bs) in &idom {
+        for b in bs {
+            *idom_inv.get_mut(b).unwrap() = Some(*a);
+        }
+    }
+
+    for bb in &func.bbs {
+        let a = bb.id;
+        for b in bb.term().nexts() {
+            let mut x = a;
+            while !sdom[&x].contains(&b) {
+                df.get_mut(&x).unwrap().insert(b);
+                x = idom_inv[&x].unwrap();
+            }
+        }
+    }
+
+    df
 }
-*/

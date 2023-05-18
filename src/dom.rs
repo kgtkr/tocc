@@ -1,29 +1,30 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    println,
+};
 
-use crate::tac::{BBId, Func};
+type Graph = HashMap<usize, HashSet<usize>>;
 
-fn dom(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
+fn dom(entry: usize, cfg: &Graph) -> HashMap<usize, HashSet<usize>> {
     // TODO: reg_allocと重複
-    let mut preds = func
-        .bbs
+    let mut preds = cfg
         .iter()
-        .map(|bb| (bb.id, HashSet::new()))
+        .map(|(a, _)| (a, HashSet::new()))
         .collect::<HashMap<_, _>>();
-    for bb in &func.bbs {
-        for next in bb.term().nexts() {
-            preds.get_mut(&next).unwrap().insert(bb.id);
+    for (a, edges) in cfg {
+        for b in edges {
+            preds.get_mut(&b).unwrap().insert(a);
         }
     }
 
-    let mut doms = func
-        .bbs
+    let mut doms = cfg
         .iter()
-        .map(|bb| {
-            (bb.id, {
-                if bb.id == func.entry {
-                    HashSet::from([bb.id])
+        .map(|(&a, _)| {
+            (a, {
+                if a == entry {
+                    HashSet::from([a])
                 } else {
-                    func.bbs.iter().map(|bb| bb.id).collect()
+                    cfg.iter().map(|(a, _)| a).copied().collect()
                 }
             })
         })
@@ -32,21 +33,21 @@ fn dom(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
 
     while changed {
         changed = false;
-        for bb in func.bbs.iter().filter(|bb| bb.id != func.entry) {
-            let mut new_dom = preds[&bb.id]
+        for (a, edges) in cfg.iter().filter(|(&a, _)| a != entry) {
+            let mut new_dom = preds[a]
                 .iter()
                 .map(|pred| doms[pred].clone())
-                .fold::<Option<HashSet<BBId>>, _>(None, |acc, dom| {
+                .fold::<Option<HashSet<usize>>, _>(None, |acc, dom| {
                     if let Some(acc) = acc {
-                        Some(acc.intersection(&dom).cloned().collect())
+                        Some(acc.intersection(&dom).copied().collect())
                     } else {
                         Some(dom)
                     }
                 })
                 .unwrap();
-            new_dom.insert(bb.id);
-            if new_dom.len() != doms[&bb.id].len() {
-                doms.insert(bb.id, new_dom);
+            new_dom.insert(*a);
+            if new_dom.len() != doms[a].len() {
+                doms.insert(*a, new_dom);
                 changed = true;
             }
         }
@@ -55,8 +56,8 @@ fn dom(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
     doms
 }
 
-fn sdom(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
-    let doms = dom(func);
+fn sdom(entry: usize, cfg: &Graph) -> HashMap<usize, HashSet<usize>> {
+    let doms = dom(entry, cfg);
     let sdoms = doms
         .iter()
         .map(|(a, dom)| {
@@ -72,7 +73,7 @@ fn sdom(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
     sdoms
 }
 
-fn idom(sdoms: HashMap<BBId, HashSet<BBId>>) -> HashMap<BBId, HashSet<BBId>> {
+fn idom(sdoms: HashMap<usize, HashSet<usize>>) -> HashMap<usize, Option<usize>> {
     let mut sdom_preds = sdoms
         .iter()
         .map(|(bb_id, _)| (bb_id, HashSet::new()))
@@ -87,10 +88,13 @@ fn idom(sdoms: HashMap<BBId, HashSet<BBId>>) -> HashMap<BBId, HashSet<BBId>> {
         .iter()
         .map(|(a, sdom)| {
             (*a, {
-                sdom.iter()
+                let mut iter = sdom
+                    .iter()
                     .filter(|b| sdom_preds[b].iter().all(|c| !sdom.contains(c)))
-                    .copied()
-                    .collect::<HashSet<_>>()
+                    .copied();
+                let ret = iter.next();
+                debug_assert!(iter.next().is_none());
+                ret
             })
         })
         .collect::<HashMap<_, _>>();
@@ -98,37 +102,53 @@ fn idom(sdoms: HashMap<BBId, HashSet<BBId>>) -> HashMap<BBId, HashSet<BBId>> {
     idoms
 }
 
-fn dom_front(func: &Func) -> HashMap<BBId, HashSet<BBId>> {
-    let sdom = sdom(func);
+fn dom_front(entry: usize, cfg: &Graph) -> HashMap<usize, HashSet<usize>> {
+    let sdom = sdom(entry, cfg);
     let idom = idom(sdom.clone());
 
-    let mut df = func
-        .bbs
+    let mut df = cfg
         .iter()
-        .map(|bb| (bb.id, HashSet::new()))
+        .map(|(a, _)| (*a, HashSet::new()))
         .collect::<HashMap<_, _>>();
 
-    let mut idom_inv = idom
-        .iter()
-        .map(|(bb_id, _)| (*bb_id, None))
-        .collect::<HashMap<_, _>>();
-    for (a, bs) in &idom {
-        for b in bs {
-            debug_assert!(idom_inv[b].is_none());
-            *idom_inv.get_mut(b).unwrap() = Some(*a);
-        }
-    }
-
-    for bb in &func.bbs {
-        let a = bb.id;
-        for b in bb.term().nexts() {
+    for (&a, edges) in cfg {
+        for &b in edges {
             let mut x = a;
             while !sdom[&x].contains(&b) {
                 df.get_mut(&x).unwrap().insert(b);
-                x = idom_inv[&x].unwrap();
+                if let Some(new_x) = idom[&x] {
+                    x = new_x;
+                } else {
+                    break;
+                }
             }
         }
     }
 
     df
+}
+
+#[test]
+fn test_dom() {
+    // https://qiita.com/uint256_t/items/7d4556cb8f5997b9e95c
+    let cfg = HashMap::from([
+        (1, HashSet::from([2, 5])),
+        (2, HashSet::from([3, 4])),
+        (3, HashSet::from([6])),
+        (4, HashSet::from([6])),
+        (5, HashSet::from([6])),
+        (6, HashSet::from([])),
+    ]);
+    let dom_front = dom_front(1, &cfg);
+    assert_eq!(
+        dom_front,
+        HashMap::from([
+            (1, HashSet::from([])),
+            (2, HashSet::from([6])),
+            (3, HashSet::from([6])),
+            (4, HashSet::from([6])),
+            (5, HashSet::from([])),
+            (6, HashSet::from([])),
+        ])
+    );
 }
